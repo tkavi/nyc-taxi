@@ -1,4 +1,4 @@
-AWSTemplateFormatVersion: '2026-01-02'
+AWSTemplateFormatVersion: '2010-09-09'
 Description: 'NYC Taxi Project Infrastructure'
 
 Parameters:
@@ -52,7 +52,7 @@ Resources:
       Policies:
         - PolicyName: S3DataLakeAccess
           PolicyDocument:
-            Version: '2025-01-02'
+            Version: '2012-10-17'
             Statement:
               - Effect: Allow
                 Action:
