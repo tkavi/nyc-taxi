@@ -1,0 +1,69 @@
+AWSTemplateFormatVersion: '2026-01-02'
+Description: 'NYC Taxi Project Infrastructure'
+
+Parameters:
+  ProjectName:
+    Type: String
+    Default: nyc-taxi
+    Description: Prefix for S3 buckets
+    
+  Env:
+    Type: String
+    Default: dev
+    AllowedValues: [dev, stg, prod]
+    Description: Environment name to include in bucket names
+
+Resources:
+  # --- Storage Layer: S3 Buckets --- #
+  RawBucket:
+    Type: 'AWS::S3::Bucket'
+    Properties:
+      BucketName: !Sub '${ProjectName}-${Env}-raw'
+  
+  ProcessedBucket:
+    Type: 'AWS::S3::Bucket'
+    Properties:
+      BucketName: !Sub '${ProjectName}-${Env}-processed'
+
+  CuratedBucket:
+    Type: 'AWS::S3::Bucket'
+    Properties:
+      BucketName: !Sub '${ProjectName}-${Env}-curated'
+
+  MasterBucket:
+    Type: 'AWS::S3::Bucket'
+    Properties:
+      BucketName: !Sub '${ProjectName}-${Env}-master'
+
+  # --- Compute Layer: IAM Role for AWS Glue --- #
+  GlueServiceRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      RoleName: !Sub '${ProjectName}--${Env}-glue-role'
+      AssumeRolePolicyDocument:
+        Version: '2025-01-02'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: [glue.amazonaws.com]
+            Action: ['sts:AssumeRole']
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSGlueServiceRole
+      Policies:
+        - PolicyName: S3DataLakeAccess
+          PolicyDocument:
+            Version: '2025-01-02'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 's3:GetObject'
+                  - 's3:PutObject'
+                  - 's3:DeleteObject'
+                  - 's3:ListBucket'
+                Resource:
+                  - !Sub 'arn:aws:s3:::${ProjectName}-${Env}-*'
+                  - !Sub 'arn:aws:s3:::${ProjectName}-${Env}-*/*'
+
+Outputs:
+  GlueRoleArn:
+    Value: !GetAtt GlueServiceRole.Arn
