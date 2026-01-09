@@ -36,8 +36,9 @@ Resources:
       BucketName: !Sub '${ProjectName}-${Env}-master'
 
   # --- Compute Layer: IAM Role for AWS Glue --- #
-  GlueServiceRole:
+  GlueServiceRoleNew:
     Type: 'AWS::IAM::Role'
+    DeletionPolicy: Retain
     Properties:
       Path: /service-role/
       AssumeRolePolicyDocument:
