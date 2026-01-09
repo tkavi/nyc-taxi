@@ -25,20 +25,19 @@ jobs:
         run: |
           aws s3 sync ./scripts s3://nyc-taxi-dev-raw-206617159909/scripts/ --delete
 
-      - name: Prepare Step Function Definition
-        id: sf_def
-        # allows long, complex strings to be stored safely in single line
+      # Upload the Step Function JSON to S3
+      - name: Upload SF Definition to S3
         run: |
-          B64_JSON=$(jq -c . step_functions/nyc-taxi-sf.json | base64 -w 0)
-          echo "definition=$B64_JSON" >> $GITHUB_OUTPUT
+          aws s3 cp step_functions/nyc-taxi-sf.json s3://nyc-taxi-dev-raw-206617159909/sf_scripts/nyc-taxi-sf.json
 
+      # Deploy CloudFormation 
       - name: Deploy CloudFormation
-        run: |
-          aws cloudformation deploy \
-            --stack-name nyc-yellow-taxi-stack \
-            --template-file cloud_formation/nyc-taxi-infra.yaml \
-            --capabilities CAPABILITY_NAMED_IAM \
-            --parameter-overrides \
-                ProjectName=nyc-taxi \
-                Env=dev \
-                StepFunctionDefinition='${{ steps.sf_def.outputs.definition }}'
+        uses: aws-actions/aws-cloudformation-github-deploy@v1
+        with:
+          name: nyc-yellow-taxi-stack
+          template: cloud_formation/nyc-taxi-infra.yaml
+          no-fail-on-empty-changeset: "1"
+          capabilities: CAPABILITY_NAMED_IAM
+          parameter-overrides: >-
+            ProjectName=nyc-taxi,
+            Env=dev
