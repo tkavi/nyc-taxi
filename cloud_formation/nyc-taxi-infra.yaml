@@ -154,6 +154,19 @@ Resources:
                   - 'glue:GetJobRuns'
                   - 'glue:BatchGetJobs'
                 Resource: '*' # Or narrow down to your specific Job/Crawler ARNs
+                # Permissions to send logsto CloudWatch
+              - Effect: Allow
+                Action:
+                  - "logs:CreateLogDelivery"
+                  - "logs:GetLogDelivery"
+                  - "logs:UpdateLogDelivery"
+                  - "logs:DeleteLogDelivery"
+                  - "logs:ListLogDeliveries"
+                  - "logs:PutLogEvents"
+                  - "logs:PutResourcePolicy"
+                  - "logs:DescribeResourcePolicies"
+                  - "logs:DescribeLogGroups"
+                Resource: "*"
 
   # --- ETL Layer: AWS Glue Job --- #
   RawToProcessedJob:
@@ -190,6 +203,8 @@ Resources:
   # --- ETL Layer: AWS Glue Job --- # 
   NycTaxiStateMachine:
     Type: 'AWS::StepFunctions::StateMachine'
+    DependsOn: 
+      - StepFunctionExecutionRole
     Properties:
       StateMachineName: !Sub '${ProjectName}-${Env}-sf'
       RoleArn: !GetAtt StepFunctionExecutionRole.Arn
