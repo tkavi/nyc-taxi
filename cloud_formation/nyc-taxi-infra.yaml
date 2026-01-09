@@ -76,7 +76,7 @@ Resources:
       DatabaseName: !Ref GlueCatalogDatabase
       Targets:
         S3Targets:
-          - Path: !Sub 's3://${ProjectName}-${Env}-raw-${AWS::AccountId}/nyc_taxi_data/'
+          - Path: !Sub 's3://${ProjectName}-${Env}-raw-${AWS::AccountId}/landing_files/'
       TablePrefix: 'raw_'
       SchemaChangePolicy:
         UpdateBehavior: 'UPDATE_IN_DATABASE'
@@ -138,11 +138,11 @@ Resources:
       GlueVersion: '3.0'
       Command:
         Name: glueetl
-        ScriptLocation: !Sub 's3://${ProjectName}-${Env}-raw-${AWS::AccountId}/scripts/raw_to_processed.py'
+        ScriptLocation: !Sub 's3://${ProjectName}-${Env}-raw-${AWS::AccountId}/scripts/glue/raw_to_processed.py'
       DefaultArguments:
         # These map directly to the sys.argv in your PySpark script
         '--JOB_NAME': !Sub '${ProjectName}-${Env}-raw-to-processed-job'
-        '--RAW_TABLE_NAME': 'raw_nyc_taxi_data'
+        '--RAW_TABLE_NAME': 'raw_landing_files'
         '--CATALOG_DB': !Sub '${ProjectName}_${Env}_db'
         '--SQL_DIR': !Sub 's3://${ProjectName}-${Env}-raw-${AWS::AccountId}/scripts/sql/'
         '--PROCESSED_PATH': !Sub 's3://${ProjectName}-${Env}-processed-${AWS::AccountId}/processed_files/'
