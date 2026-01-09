@@ -27,9 +27,12 @@ jobs:
 
       - name: Prepare Step Function Definition
         id: sf_def
+        # allows long, complex strings to be stored safely
         run: |
-          JSON_STRING=$(cat step_functions/nyc-taxi-sf.json | jq -c . | sed 's/"/\\"/g')
-          echo "definition=$JSON_STRING" >> $GITHUB_OUTPUT
+          JSON_STRING=$(jq -c . step_functions/nyc-taxi-sf.json | sed 's/"/\\"/g')
+          echo "definition<<EOF" >> $GITHUB_OUTPUT
+          echo "$JSON_STRING" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
 
       - name: Deploy CloudFormation
         uses: aws-actions/aws-cloudformation-github-deploy@v1
@@ -38,7 +41,7 @@ jobs:
           template: cloud_formation/nyc-taxi-infra.yaml
           no-fail-on-empty-changeset: "1"
           capabilities: CAPABILITY_NAMED_IAM
-          parameter-overrides: >
+          parameter-overrides: >-
             ProjectName=nyc-taxi,
             Env=dev,
             StepFunctionDefinition="${{ steps.sf_def.outputs.definition }}"
