@@ -1,12 +1,23 @@
 import sys
+import datetime
+
 from awsglue.utils import getResolvedOptions
-from pyspark.context import SparkContext
 from awsglue.context import GlueContext
 from awsglue.job import Job
+from awsgluedq.transforms import EvaluateDataQuality
+
+from pyspark.context import SparkContext
 from pyspark.sql.functions import col, unix_timestamp, round, when
+from pyspark.sql import SparkSession
 
 # These arguments are passed from the CloudFormation YAML
-args = getResolvedOptions(sys.argv, ['JOB_NAME', 'RAW_PATH', 'PROCESSED_PATH'])
+args = getResolvedOptions(sys.argv, [
+    'JOB_NAME',
+    'RAW_TABLE_NAME', 
+    'CATALOG_DB', 
+    'PROCESSED_PATH', 
+    'SQL_DIR'
+])
 
 sc = SparkContext()
 glueContext = GlueContext(sc)
@@ -14,52 +25,73 @@ spark = glueContext.spark_session
 job = Job(glueContext)
 job.init(args['JOB_NAME'], args)
 
-print(f"Reading data from: {args['RAW_PATH']}")
+# --- Helper to load SQL from S3 ---
+def load_sql(filename):
+    path = f"{args['SQL_DIR']}{filename}"
+    return spark.read.text(path).collect()[0][0]
 
-# 1. Read the Raw Parquet Data
-df = spark.read.parquet(args['RAW_PATH'])
+# 1. Cleaning
+raw_f = glueContext.create_dynamic_frame.from_catalog(
+    database=args['CATALOG_DB'], 
+    table_name=args['RAW_TABLE'])
 
-# 2. Basic Transformation: Count rows (for logging)
-row_count = df.count()
-print(f"Total rows found: {row_count}")
+raw_df = raw_f.toDF()
 
-# 2. VALIDATE & CLEAN: Remove "Impossible" Data
-# - Fare must be positive
-# - Trip distance must be greater than 0
-# - Passenger count must be at least 1 (usually)
-# - Dropoff must be after Pickup
-cleaned_df = df.filter(
-    (col("fare_amount") > 0) & 
-    (col("trip_distance") > 0) & 
-    (col("passenger_count") > 0) &
-    (col("tpep_dropoff_datetime") > col("tpep_pickup_datetime"))
+raw_df.createOrReplaceTempView("raw_nyc_taxi_data")
+clean_df = spark.sql(load_sql("cleaning.sql"))
+
+# 2. Trip Duration and category
+clean_df.createOrReplaceTempView("clean_table")
+final_df = spark.sql(load_sql("trip_duration_ctg.sql"))
+
+# 3. Data Quality Gat
+dq_rules = """
+    Rules = [
+        ColumnValues "fare" > 0,
+        ColumnValues "trip_distance" > 0,
+        ColumnValues "trip_duration_min" >= 0
+    ]
+"""
+
+print("Evaluating Data Quality...")
+dq_results = EvaluateDataQuality.apply(
+    frame = final_df,
+    ruleset = dq_rules,
+    publishing_options = {
+        "dataQualityTarget": f"{args['PROCESSED_PATH']}dq_results/",
+        "enableDataQualityCloudWatchMetrics": True,
+        "enableDataQualityResultsPublishing": True
+    }
 )
 
-# 3. TRANSFORM: Feature Engineering
-# Calculate Trip Duration in minutes
-cleaned_df = cleaned_df.withColumn(
-    "trip_duration_minutes",
-    round((unix_timestamp("tpep_dropoff_datetime") - unix_timestamp("tpep_pickup_datetime")) / 60, 2)
-)
-
-# 4. HANDLE NULLS: Fill missing flags with "N"
-cleaned_df = cleaned_df.fillna({"store_and_fwd_flag": "N"})
-
-# Log cleaning results
-final_count = cleaned_df.count()
-print(f"Cleaning complete. Removed {row_count - final_count} bad records.")
-
-# 3. Write to Processed Bucket as delta
-# df.write.mode("overwrite").parquet(args['PROCESSED_PATH'])
-df.write.format("delta").mode("overwrite").save(args['PROCESSED_PATH'])
-
-# To perform an Upsert (Merge)
-# from delta.tables import DeltaTable
-
-# deltaTable = DeltaTable.forPath(spark, args['PROCESSED_PATH'])
-# deltaTable.alias("oldData").merge(
-#     newData.alias("newData"),
-#     "oldData.id = newData.id"
-# ).whenMatchedUpdateAll().whenNotMatchedInsertAll().execute()
+# --- 5. CONDITIONAL WRITE (The Governance Gate) ---
+# Only write to Processed if ALL DQ rules pass.
+if dq_results.all_rules_passed:
+    print("DQ Passed. Writing as Delta in Processed bucket...")
+    final_df.write \
+        .format("delta") \
+        .mode("overwrite") \
+        .option("mergeSchema", "true") \
+        .save(args['PROCESSED_PATH'])
+else:
+    # 1. Generate a timestamped path for the quarantine folder
+    run_date = datetime.datetime.now().strftime("year=%Y/month=%m/day=%d/run=%H%M")
+    
+    # 2. Extract the Raw Bucket name from your PROCESSD_PATH
+    raw_bucket_base = args['PROCESSED_PATH'].replace("processed", "raw").split('/')[0:3]
+    raw_bucket_url = "/".join(raw_bucket_base)
+    quarantine_path = f"{raw_bucket_base}/quarantine/{run_date}/"
+    
+    print(f"DQ FAILED. Moving {final_df.count()} records to {quarantine_path}")
+    
+    # 3. Write bad data as Parquet so you can analyze it with Athena later
+    print("DQ FAILED. Writing to Quarantine and stopping job.")
+    final_df.write \
+        .format("parquet") \
+        .mode("append") \
+        .save(quarantine_path)
+    
+    job.commit() # Commit even on failure to record state  
+    sys.exit("Job failed: Data Quality threshold not met. Inspect quarantine folder.")
 
 job.commit()

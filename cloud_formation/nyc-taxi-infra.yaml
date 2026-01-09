@@ -59,6 +59,29 @@ Resources:
           - ServerSideEncryptionByDefault:
               SSEAlgorithm: AES256
 
+  # --- 2. Metadata Layer: Glue Catalog --- #
+  GlueCatalogDatabase:
+    Type: 'AWS::Glue::Database'
+    Properties:
+      CatalogId: !Ref 'AWS::AccountId'
+      DatabaseInput:
+        Name: !Sub '${ProjectName}_${Env}_db'
+
+  # This Crawler scans the CSVs in the Raw bucket and creates the Catalog Table
+  RawDataCrawler:
+    Type: 'AWS::Glue::Crawler'
+    Properties:
+      Name: !Sub '${ProjectName}-${Env}-raw-csv-crawler'
+      Role: !GetAtt GlueServiceRoleNew.Arn
+      DatabaseName: !Ref GlueCatalogDatabase
+      Targets:
+        S3Targets:
+          - Path: !Sub 's3://${ProjectName}-${Env}-raw-${AWS::AccountId}/nyc_taxi_data/'
+      TablePrefix: 'raw_'
+      SchemaChangePolicy:
+        UpdateBehavior: 'UPDATE_IN_DATABASE'
+        DeleteBehavior: 'LOG'
+
   # --- Compute Layer: IAM Role for AWS Glue --- #
   GlueServiceRoleNew:
     Type: 'AWS::IAM::Role'
@@ -84,6 +107,7 @@ Resources:
           PolicyDocument:
             Version: '2012-10-17'
             Statement:
+              # Permissions for the S3
               - Effect: Allow
                 Action:
                   - 's3:GetObject'
@@ -93,6 +117,17 @@ Resources:
                 Resource:
                   - !Sub 'arn:aws:s3:::${ProjectName}-${Env}-*-${AWS::AccountId}'
                   - !Sub 'arn:aws:s3:::${ProjectName}-${Env}-*-${AWS::AccountId}/*'
+              # Permissions for the Crawler to create/update tables
+              - Effect: Allow
+                Action:
+                  - 'glue:CreateTable'
+                  - 'glue:UpdateTable'
+                  - 'glue:GetTable'
+                  - 'glue:GetDatabase'
+                Resource:
+                  - !Sub 'arn:aws:arn:aws:glue:${AWS::Region}:${AWS::AccountId}:catalog'
+                  - !Sub 'arn:aws:glue:${AWS::Region}:${AWS::AccountId}:database/${ProjectName}_${Env}_db'
+                  - !Sub 'arn:aws:glue:${AWS::Region}:${AWS::AccountId}:table/${ProjectName}_${Env}_db/*'
 
   # --- ETL Layer: AWS Glue Job --- #
   RawToProcessedJob:
@@ -107,8 +142,10 @@ Resources:
       DefaultArguments:
         # These map directly to the sys.argv in your PySpark script
         '--JOB_NAME': !Sub '${ProjectName}-${Env}-raw-to-processed-job'
-        '--RAW_PATH': !Sub 's3://${ProjectName}-${Env}-raw-${AWS::AccountId}/landing-files/'
-        '--PROCESSED_PATH': !Sub 's3://${ProjectName}-${Env}-processed-${AWS::AccountId}/processed-files/'
+        '--RAW_TABLE_NAME': 'raw_nyc_taxi_data'
+        '--CATALOG_DB': !Sub '${ProjectName}_${Env}_db'
+        '--SQL_DIR': !Sub 's3://${ProjectName}-${Env}-raw-${AWS::AccountId}/scripts/sql/'
+        '--PROCESSED_PATH': !Sub 's3://${ProjectName}-${Env}-processed-${AWS::AccountId}/processed_files/'
         # Enables Delta Lake format support
         '--datalake-formats': 'delta'
         # Required Spark configuration for Delta extensions
@@ -126,6 +163,8 @@ Outputs:
     Value: !Ref RawBucket
   ProcessedBucketName:
     Value: !Ref ProcessedBucket
+  GlueDatabaseName:
+    Value: !Ref GlueCatalogDatabase
   GlueJobName:
     Value: !Ref RawToProcessedJob
 
