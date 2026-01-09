@@ -67,11 +67,5 @@ Resources:
                   - 's3:DeleteObject'
                   - 's3:ListBucket'
                 Resource:
-                  - !GetAtt RawBucket.Arn
-                  - !Sub '${RawBucket.Arn}/*'
-                  - !GetAtt ProcessedBucket.Arn
-                  - !Sub '${ProcessedBucket.Arn}/*'
-                  - !GetAtt CuratedBucket.Arn
-                  - !Sub '${CuratedBucket.Arn}/*'
-                  - !GetAtt MasterBucket.Arn
-                  - !Sub '${MasterBucket.Arn}/*'
+                  - !Sub 'arn:aws:s3:::${ProjectName}-${Env}-*-${AWS::AccountId}'
+                  - !Sub 'arn:aws:s3:::${ProjectName}-${Env}-*-${AWS::AccountId}/*'
