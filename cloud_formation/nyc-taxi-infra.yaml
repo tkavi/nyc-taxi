@@ -201,10 +201,10 @@ Resources:
       DefinitionSubstitutions:
         CrawlerName: !Ref RawDataCrawler
         GlueJobName: !Ref RawToProcessedJob
-      # This reads the JSON logic from your local file during deployment
-      DefinitionString: 
-        !Sub |
-          ${StepFunctionDefinition}
+      # This reads the JSON logic from s3 
+      DefinitionS3Location:
+        Bucket: !Ref RawBucket
+        Key: 'sf_scripts/nyc-taxi-sf.json'
 
 Outputs:
   RawBucketName:
