@@ -64,18 +64,3 @@ Resources:
                   - !Sub 'arn:aws:s3:::${ProjectName}-${Env}-*'
                   - !Sub 'arn:aws:s3:::${ProjectName}-${Env}-*/*'
 
-Outputs:
-  RawBucketName:
-    Value: !Ref RawBucket
-  
-  ProcessedBucketName:
-    Value: !Ref ProcessedBucket
-
-  CuratedBucketName:
-    Value: !Ref CuratedBucket
-
-  MasterBucketName:
-    Value: !Ref MasterBucket
-
-  GlueRoleArn:
-    Value: !GetAtt GlueServiceRole.Arn
