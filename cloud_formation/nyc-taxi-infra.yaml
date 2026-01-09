@@ -12,10 +12,6 @@ Parameters:
     Default: dev
     AllowedValues: [dev, stg, prod]
     Description: Environment name to include in bucket names
-  
-  StepFunctionDefinition:
-    Type: String
-    Description: Stringified JSON definition for the Step Function
 
 
 Resources:
