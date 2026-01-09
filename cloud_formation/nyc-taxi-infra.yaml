@@ -12,6 +12,11 @@ Parameters:
     Default: dev
     AllowedValues: [dev, stg, prod]
     Description: Environment name to include in bucket names
+  
+  StepFunctionDefinition:
+    Type: String
+    Description: Stringified JSON definition for the Step Function
+
 
 Resources:
   # --- Storage Layer: S3 Buckets --- #
@@ -129,6 +134,31 @@ Resources:
                   - !Sub 'arn:aws:glue:${AWS::Region}:${AWS::AccountId}:database/${ProjectName}_${Env}_db'
                   - !Sub 'arn:aws:glue:${AWS::Region}:${AWS::AccountId}:table/${ProjectName}_${Env}_db/*'
 
+  StepFunctionExecutionRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: states.amazonaws.com
+            Action: 'sts:AssumeRole'
+      Policies:
+        - PolicyName: StepFunctionGlueAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 'glue:StartCrawler'
+                  - 'glue:GetCrawler'
+                  - 'glue:StartJobRun'
+                  - 'glue:GetJobRun'
+                  - 'glue:GetJobRuns'
+                  - 'glue:BatchGetJobs'
+                Resource: '*' # Or narrow down to your specific Job/Crawler ARNs
+
   # --- ETL Layer: AWS Glue Job --- #
   RawToProcessedJob:
     Type: 'AWS::Glue::Job'
@@ -161,6 +191,21 @@ Resources:
       MaxCapacity: 2.0
       Timeout: 5
 
+  # --- ETL Layer: AWS Glue Job --- # 
+  NycTaxiStateMachine:
+    Type: 'AWS::StepFunctions::StateMachine'
+    Properties:
+      StateMachineName: !Sub '${ProjectName}-${Env}-sf'
+      RoleArn: !GetAtt StepFunctionExecutionRole.Arn
+      # Use DefinitionSubstitutions to pass dynamic values into your JSON file
+      DefinitionSubstitutions:
+        CrawlerName: !Ref RawDataCrawler
+        GlueJobName: !Ref RawToProcessedJob
+      # This reads the JSON logic from your local file during deployment
+      DefinitionString: 
+        !Sub |
+          ${StepFunctionDefinition}
+
 Outputs:
   RawBucketName:
     Value: !Ref RawBucket
@@ -170,4 +215,6 @@ Outputs:
     Value: !Ref GlueCatalogDatabase
   GlueJobName:
     Value: !Ref RawToProcessedJob
+  StateMachineArn:
+    Value: !Ref NycTaxiStateMachine
 

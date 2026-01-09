@@ -1,0 +1,41 @@
+{
+  "StartAt": "StartCrawler",
+  "States": {
+    "StartCrawler": {
+      "Type": "Task",
+      "Parameters": { "Name": "${CrawlerName}" },
+      "Resource": "arn:aws:states:::aws-sdk:glue:startCrawler",
+      "Next": "WaitForCrawler"
+    },
+    "WaitForCrawler": {
+      "Type": "Wait",
+      "Seconds": 30,
+      "Next": "GetCrawlerStatus"
+    },
+    "GetCrawlerStatus": {
+      "Type": "Task",
+      "Parameters": { "Name": "${CrawlerName}" },
+      "Resource": "arn:aws:states:::aws-sdk:glue:getCrawler",
+      "Next": "IsCrawlerDone"
+    },
+    "IsCrawlerDone": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Variable": "$.Crawler.State",
+          "StringEquals": "READY",
+          "Next": "RunGlueJob"
+        }
+      ],
+      "Default": "WaitForCrawler"
+    },
+    "RunGlueJob": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::glue:startJobRun.sync",
+      "Parameters": {
+        "JobName": "${GlueJobName}"
+      },
+      "End": true
+    }
+  }
+}

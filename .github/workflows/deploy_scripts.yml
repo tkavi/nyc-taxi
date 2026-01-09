@@ -21,6 +21,24 @@ jobs:
           aws-region: us-east-2
 
       - name: Sync scripts to S3
-        # To copy local /scripts folder to S3 bucket
+        # To copy local scripts folder to S3 bucket
         run: |
           aws s3 sync ./scripts s3://nyc-taxi-dev-raw-206617159909/scripts/ --delete
+
+      - name: Prepare Step Function Definition
+        id: sf_def
+        run: |
+          JSON_STRING=$(cat step_functions/nyc-taxi-sf.json | jq -c . | sed 's/"/\\"/g')
+          echo "definition=$JSON_STRING" >> $GITHUB_OUTPUT
+
+      - name: Deploy CloudFormation
+        uses: aws-actions/aws-cloudformation-github-deploy@v1
+        with:
+          name: nyc-yellow-taxi-stack
+          template: cloud_formation/nyc-taxi-infra.yaml
+          no-fail-on-empty-changeset: "1"
+          capabilities: CAPABILITY_NAMED_IAM
+          parameter-overrides: >
+            ProjectName=nyc-taxi,
+            Env=dev,
+            StepFunctionDefinition="${{ steps.sf_def.outputs.definition }}"
