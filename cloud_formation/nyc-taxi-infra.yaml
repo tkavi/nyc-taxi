@@ -139,6 +139,9 @@ Resources:
       Command:
         Name: glueetl
         ScriptLocation: !Sub 's3://${ProjectName}-${Env}-raw-${AWS::AccountId}/scripts/glue/raw_to_processed.py'
+      ExecutionProperty:
+        MaxConcurrentRuns: 1
+      MaxRetries: 0  # <--- Set to 0 to save credits on failure
       DefaultArguments:
         # These map directly to the sys.argv in your PySpark script
         '--JOB_NAME': !Sub '${ProjectName}-${Env}-raw-to-processed-job'
@@ -156,7 +159,7 @@ Resources:
         '--enable-observability-metrics': 'true'     # Advanced visual monitoring
         '--job-bookmark-option': 'job-bookmark-enable'
       MaxCapacity: 2.0
-      Timeout: 2880
+      Timeout: 5
 
 Outputs:
   RawBucketName:
