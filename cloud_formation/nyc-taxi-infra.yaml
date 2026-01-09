@@ -19,21 +19,29 @@ Resources:
     Type: 'AWS::S3::Bucket'
     Properties:
       BucketName: !Sub '${ProjectName}-${Env}-raw-${AWS::AccountId}'
+      VersioningConfiguration:
+        Status: Enabled
   
   ProcessedBucket:
     Type: 'AWS::S3::Bucket'
     Properties:
       BucketName: !Sub '${ProjectName}-${Env}-processed-${AWS::AccountId}'
+      VersioningConfiguration:
+        Status: Enabled
 
   CuratedBucket:
     Type: 'AWS::S3::Bucket'
     Properties:
       BucketName: !Sub '${ProjectName}-${Env}-curated-${AWS::AccountId}'
+      VersioningConfiguration:
+        Status: Enabled
 
   MasterBucket:
     Type: 'AWS::S3::Bucket'
     Properties:
       BucketName: !Sub '${ProjectName}-${Env}-master-${AWS::AccountId}'
+      VersioningConfiguration:
+        Status: Enabled
 
   # --- Compute Layer: IAM Role for AWS Glue --- #
   GlueServiceRoleNew:
