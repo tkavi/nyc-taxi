@@ -21,6 +21,10 @@ Resources:
       BucketName: !Sub '${ProjectName}-${Env}-raw-${AWS::AccountId}'
       VersioningConfiguration:
         Status: Enabled
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256 # Use AES256 (SSE-S3) or aws:kms (SSE-KMS)
   
   ProcessedBucket:
     Type: 'AWS::S3::Bucket'
@@ -28,6 +32,10 @@ Resources:
       BucketName: !Sub '${ProjectName}-${Env}-processed-${AWS::AccountId}'
       VersioningConfiguration:
         Status: Enabled
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
 
   CuratedBucket:
     Type: 'AWS::S3::Bucket'
@@ -35,6 +43,10 @@ Resources:
       BucketName: !Sub '${ProjectName}-${Env}-curated-${AWS::AccountId}'
       VersioningConfiguration:
         Status: Enabled
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
 
   MasterBucket:
     Type: 'AWS::S3::Bucket'
@@ -42,6 +54,10 @@ Resources:
       BucketName: !Sub '${ProjectName}-${Env}-master-${AWS::AccountId}'
       VersioningConfiguration:
         Status: Enabled
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
 
   # --- Compute Layer: IAM Role for AWS Glue --- #
   GlueServiceRoleNew:
@@ -93,6 +109,10 @@ Resources:
         '--JOB_NAME': !Sub '${ProjectName}-${Env}-raw-to-processed-job'
         '--RAW_PATH': !Sub 's3://${ProjectName}-${Env}-raw-${AWS::AccountId}/landing-files/'
         '--PROCESSED_PATH': !Sub 's3://${ProjectName}-${Env}-processed-${AWS::AccountId}/processed-files/'
+        # Enables Delta Lake format support
+        '--datalake-formats': 'delta'
+        # Required Spark configuration for Delta extensions
+        '--conf': 'spark.sql.extensions=io.delta.sql.DeltaSparkSessionExtension --conf spark.sql.catalog.spark_catalog=org.apache.spark.sql.delta.catalog.DeltaCatalog'
         # Logging and performance defaults
         '--enable-continuous-cloudwatch-log': 'true' # Real-time text logs
         '--enable-metrics': 'true'                   # Basic CloudWatch metrics
