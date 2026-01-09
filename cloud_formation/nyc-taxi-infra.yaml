@@ -64,4 +64,3 @@ Resources:
                 Resource:
                   - !Sub 'arn:aws:s3:::${ProjectName}-${Env}-*'
                   - !Sub 'arn:aws:s3:::${ProjectName}-${Env}-*/*'
-
