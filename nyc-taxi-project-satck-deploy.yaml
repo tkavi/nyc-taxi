@@ -1,0 +1,3 @@
+template-file-path: cloud_formation/nyc-taxi-infra.yaml
+parameters: {}
+tags: {}
