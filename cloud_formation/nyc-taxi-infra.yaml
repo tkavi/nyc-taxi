@@ -39,6 +39,7 @@ Resources:
   GlueServiceRole:
     Type: 'AWS::IAM::Role'
     Properties:
+      Path: /service-role/
       AssumeRolePolicyDocument:
         Version: '2012-10-17'
         Statement:
