@@ -39,7 +39,7 @@ Resources:
   GlueServiceRole:
     Type: 'AWS::IAM::Role'
     Properties:
-      RoleName: !Sub '${ProjectName}--${Env}-glue-role'
+      RoleName: !Sub '${ProjectName}-${Env}-glue-role'
       AssumeRolePolicyDocument:
         Version: '2025-01-02'
         Statement:
