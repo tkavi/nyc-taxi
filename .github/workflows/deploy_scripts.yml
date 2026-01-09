@@ -33,13 +33,12 @@ jobs:
           echo "definition=$B64_JSON" >> $GITHUB_OUTPUT
 
       - name: Deploy CloudFormation
-        uses: aws-actions/aws-cloudformation-github-deploy@v1
-        with:
-          name: nyc-yellow-taxi-stack
-          template: cloud_formation/nyc-taxi-infra.yaml
-          no-fail-on-empty-changeset: "1"
-          capabilities: CAPABILITY_NAMED_IAM
-          parameter-overrides: >-
-            ProjectName=nyc-taxi,
-            Env=dev,
-            StepFunctionDefinition="${{ steps.sf_def.outputs.definition }}"
+        run: |
+          aws cloudformation deploy \
+            --stack-name nyc-yellow-taxi-stack \
+            --template-file cloud_formation/nyc-taxi-infra.yaml \
+            --capabilities CAPABILITY_NAMED_IAM \
+            --parameter-overrides \
+                ProjectName=nyc-taxi \
+                Env=dev \
+                StepFunctionDefinition='${{ steps.sf_def.outputs.definition }}'
