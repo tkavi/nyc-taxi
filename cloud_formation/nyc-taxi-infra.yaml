@@ -69,3 +69,35 @@ Resources:
                 Resource:
                   - !Sub 'arn:aws:s3:::${ProjectName}-${Env}-*-${AWS::AccountId}'
                   - !Sub 'arn:aws:s3:::${ProjectName}-${Env}-*-${AWS::AccountId}/*'
+
+  # --- ETL Layer: AWS Glue Job --- #
+  RawToProcessedJob:
+    Type: 'AWS::Glue::Job'
+    Properties:
+      Name: !Sub '${ProjectName}-${Env}-raw-to-processed-job'
+      Role: !GetAtt GlueServiceRoleNew.Arn
+      GlueVersion: '3.0'
+      Command:
+        Name: glueetl
+        ScriptLocation: !Sub 's3://${ProjectName}-${Env}-raw-${AWS::AccountId}/scripts/raw_to_processed.py'
+      DefaultArguments:
+        # These map directly to the sys.argv in your PySpark script
+        '--JOB_NAME': !Sub '${ProjectName}-${Env}-raw-to-processed-job'
+        '--RAW_PATH': !Sub 's3://${ProjectName}-${Env}-raw-${AWS::AccountId}/landing-files/'
+        '--PROCESSED_PATH': !Sub 's3://${ProjectName}-${Env}-processed-${AWS::AccountId}/processed-files/'
+        # Logging and performance defaults
+        '--enable-continuous-cloudwatch-log': 'true' # Real-time text logs
+        '--enable-metrics': 'true'                   # Basic CloudWatch metrics
+        '--enable-observability-metrics': 'true'     # Advanced visual monitoring
+        '--job-bookmark-option': 'job-bookmark-enable'
+      MaxCapacity: 2.0
+      Timeout: 2880
+
+Outputs:
+  RawBucketName:
+    Value: !Ref RawBucket
+  ProcessedBucketName:
+    Value: !Ref ProcessedBucket
+  GlueJobName:
+    Value: !Ref RawToProcessedJob
+

@@ -1,0 +1,26 @@
+name: Deploy Scripts to S3
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'scripts/**' # Only run if files in the scripts folder change
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-2
+
+      - name: Sync scripts to S3
+        # To copy local /scripts folder to S3 bucket
+        run: |
+          aws s3 sync ./scripts s3://nyc-taxi-dev-raw-206617159909/scripts/ --delete
