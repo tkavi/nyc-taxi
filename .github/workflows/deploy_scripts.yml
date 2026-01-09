@@ -27,12 +27,10 @@ jobs:
 
       - name: Prepare Step Function Definition
         id: sf_def
-        # allows long, complex strings to be stored safely
+        # allows long, complex strings to be stored safely in single line
         run: |
-          JSON_STRING=$(jq -c . step_functions/nyc-taxi-sf.json | sed 's/"/\\"/g')
-          echo "definition<<EOF" >> $GITHUB_OUTPUT
-          echo "$JSON_STRING" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
+          B64_JSON=$(jq -c . step_functions/nyc-taxi-sf.json | base64 -w 0)
+          echo "definition=$B64_JSON" >> $GITHUB_OUTPUT
 
       - name: Deploy CloudFormation
         uses: aws-actions/aws-cloudformation-github-deploy@v1
