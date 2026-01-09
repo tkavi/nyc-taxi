@@ -18,22 +18,22 @@ Resources:
   RawBucket:
     Type: 'AWS::S3::Bucket'
     Properties:
-      BucketName: !Sub '${ProjectName}-${Env}-raw-bucket-tkavi'
+      BucketName: !Sub '${ProjectName}-${Env}-raw-bucket-tkavi-4488'
   
   ProcessedBucket:
     Type: 'AWS::S3::Bucket'
     Properties:
-      BucketName: !Sub '${ProjectName}-${Env}-processed-bucket-tkavi'
+      BucketName: !Sub '${ProjectName}-${Env}-processed-bucket-tkavi-4488'
 
   CuratedBucket:
     Type: 'AWS::S3::Bucket'
     Properties:
-      BucketName: !Sub '${ProjectName}-${Env}-curated-bucket-tkavi'
+      BucketName: !Sub '${ProjectName}-${Env}-curated-bucket-tkavi-4488'
 
   MasterBucket:
     Type: 'AWS::S3::Bucket'
     Properties:
-      BucketName: !Sub '${ProjectName}-${Env}-master-bucket-tkavi'
+      BucketName: !Sub '${ProjectName}-${Env}-master-bucket-tkavi-4488'
 
   # --- Compute Layer: IAM Role for AWS Glue --- #
   GlueServiceRoleNew:
