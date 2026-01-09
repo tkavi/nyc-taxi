@@ -41,7 +41,7 @@ Resources:
     Properties:
       RoleName: !Sub '${ProjectName}-${Env}-glue-role'
       AssumeRolePolicyDocument:
-        Version: '2025-01-02'
+        Version: '2012-10-17'
         Statement:
           - Effect: Allow
             Principal:
@@ -65,5 +65,17 @@ Resources:
                   - !Sub 'arn:aws:s3:::${ProjectName}-${Env}-*/*'
 
 Outputs:
+  RawBucketName:
+    Value: !Ref RawBucket
+  
+  ProcessedBucketName:
+    Value: !Ref ProcessedBucket
+
+  CuratedBucketName:
+    Value: !Ref CuratedBucket
+
+  MasterBucketName:
+    Value: !Ref MasterBucket
+    
   GlueRoleArn:
     Value: !GetAtt GlueServiceRole.Arn
