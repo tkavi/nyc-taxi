@@ -39,7 +39,6 @@ Resources:
   GlueServiceRole:
     Type: 'AWS::IAM::Role'
     Properties:
-      RoleName: !Sub '${ProjectName}-${Env}-glue-role'
       AssumeRolePolicyDocument:
         Version: '2012-10-17'
         Statement:
@@ -76,6 +75,6 @@ Outputs:
 
   MasterBucketName:
     Value: !Ref MasterBucket
-    
+
   GlueRoleArn:
     Value: !GetAtt GlueServiceRole.Arn
