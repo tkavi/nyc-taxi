@@ -18,27 +18,32 @@ Resources:
   RawBucket:
     Type: 'AWS::S3::Bucket'
     Properties:
-      BucketName: !Sub '${ProjectName}-${Env}-raw'
+      BucketName: !Sub '${ProjectName}-${Env}-raw-bucket'
   
   ProcessedBucket:
     Type: 'AWS::S3::Bucket'
     Properties:
-      BucketName: !Sub '${ProjectName}-${Env}-processed'
+      BucketName: !Sub '${ProjectName}-${Env}-processed-bucket'
 
   CuratedBucket:
     Type: 'AWS::S3::Bucket'
     Properties:
-      BucketName: !Sub '${ProjectName}-${Env}-curated'
+      BucketName: !Sub '${ProjectName}-${Env}-curated-bucket'
 
   MasterBucket:
     Type: 'AWS::S3::Bucket'
     Properties:
-      BucketName: !Sub '${ProjectName}-${Env}-master'
+      BucketName: !Sub '${ProjectName}-${Env}-master-bucket'
 
   # --- Compute Layer: IAM Role for AWS Glue --- #
   GlueServiceRoleNew:
     Type: 'AWS::IAM::Role'
     DeletionPolicy: Retain
+    DependsOn: 
+      - RawBucket
+      - ProcessedBucket
+      - CuratedBucket
+      - MasterBucket
     Properties:
       Path: /service-role/
       AssumeRolePolicyDocument:
@@ -62,5 +67,11 @@ Resources:
                   - 's3:DeleteObject'
                   - 's3:ListBucket'
                 Resource:
-                  - !Sub 'arn:aws:s3:::${ProjectName}-${Env}-*'
-                  - !Sub 'arn:aws:s3:::${ProjectName}-${Env}-*/*'
+                  - !GetAtt RawBucket.Arn
+                  - !Sub '${RawBucket.Arn}/*'
+                  - !GetAtt ProcessedBucket.Arn
+                  - !Sub '${ProcessedBucket.Arn}/*'
+                  - !GetAtt CuratedBucket.Arn
+                  - !Sub '${CuratedBucket.Arn}/*'
+                  - !GetAtt MasterBucket.Arn
+                  - !Sub '${MasterBucket.Arn}/*'
