@@ -214,7 +214,7 @@ Resources:
         GlueJobName: !Ref RawToProcessedJob
       # This reads the JSON logic from s3 
       DefinitionS3Location:
-        Bucket: !Sub '${ProjectName}-${Env}-raw-${AWS::AccountId}'
+        Bucket: !Ref RawBucket
         Key: 'sf_scripts/nyc-taxi-sf.json'
 
 Outputs:
