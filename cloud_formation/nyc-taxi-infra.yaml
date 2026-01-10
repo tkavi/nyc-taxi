@@ -1,7 +1,6 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Description: 'NYC Taxi Project Infrastructure'
 
-# Force Trigger 2.0
 Parameters:
   ProjectName:
     Type: String
