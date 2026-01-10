@@ -18,6 +18,7 @@ Resources:
   # --- Storage Layer: S3 Buckets --- #
   RawBucket:
     Type: 'AWS::S3::Bucket'
+    DeletionPolicy: Retain
     Properties:
       BucketName: !Sub '${ProjectName}-${Env}-raw-${AWS::AccountId}'
       VersioningConfiguration:
@@ -29,6 +30,7 @@ Resources:
   
   ProcessedBucket:
     Type: 'AWS::S3::Bucket'
+    DeletionPolicy: Retain
     Properties:
       BucketName: !Sub '${ProjectName}-${Env}-processed-${AWS::AccountId}'
       VersioningConfiguration:
@@ -40,6 +42,7 @@ Resources:
 
   CuratedBucket:
     Type: 'AWS::S3::Bucket'
+    DeletionPolicy: Retain
     Properties:
       BucketName: !Sub '${ProjectName}-${Env}-curated-${AWS::AccountId}'
       VersioningConfiguration:
@@ -51,6 +54,7 @@ Resources:
 
   MasterBucket:
     Type: 'AWS::S3::Bucket'
+    DeletionPolicy: Retain
     Properties:
       BucketName: !Sub '${ProjectName}-${Env}-master-${AWS::AccountId}'
       VersioningConfiguration:
@@ -126,7 +130,7 @@ Resources:
                   - 'glue:GetTable'
                   - 'glue:GetDatabase'
                 Resource:
-                  - !Sub 'arn:aws:arn:aws:glue:${AWS::Region}:${AWS::AccountId}:catalog'
+                  - !Sub 'arn:aws:glue:${AWS::Region}:${AWS::AccountId}:catalog'
                   - !Sub 'arn:aws:glue:${AWS::Region}:${AWS::AccountId}:database/${ProjectName}_${Env}_db'
                   - !Sub 'arn:aws:glue:${AWS::Region}:${AWS::AccountId}:table/${ProjectName}_${Env}_db/*'
 
@@ -216,6 +220,7 @@ Resources:
       DefinitionS3Location:
         Bucket: !Ref RawBucket
         Key: 'sf_scripts/nyc-taxi-sf.json'
+
 
 Outputs:
   RawBucketName:
