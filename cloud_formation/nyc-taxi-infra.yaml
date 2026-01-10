@@ -242,4 +242,5 @@ Outputs:
     Value: !Ref RawToProcessedJob
   StateMachineArn:
     Value: !Ref NycTaxiStateMachine
+    Condition: CreateSF
 
