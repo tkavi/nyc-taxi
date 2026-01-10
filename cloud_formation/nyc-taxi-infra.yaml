@@ -1,6 +1,7 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Description: 'NYC Taxi Project Infrastructure'
 
+
 Parameters:
   ProjectName:
     Type: String
