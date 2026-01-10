@@ -9,7 +9,6 @@ on:
       - 'step_functions/**'
       - 'cloud_formation/**'
 
-
 jobs:
   deploy:
     runs-on: ubuntu-latest
