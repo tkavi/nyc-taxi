@@ -3,8 +3,11 @@ on:
   push:
     branches:
       - main
+    # Only run if files in the below folders change
     paths:
-      - 'scripts/**' # Only run if files in the scripts folder change
+      - 'scripts/**'
+      - 'step_functions/**'
+      - 'cloud_formation/**'
 
 jobs:
   deploy:
