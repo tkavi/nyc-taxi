@@ -32,6 +32,7 @@ jobs:
       - name: Upload SF Definition to S3
         run: |
           aws s3 cp ./step_functions/nyc-taxi-sf.json s3://nyc-taxi-dev-raw-206617159909/sf_scripts/nyc-taxi-sf.json
+          sleep 10 
 
       # Deploy CloudFormation 
       - name: Deploy CloudFormation
