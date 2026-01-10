@@ -1,3 +1,5 @@
 template-file-path: cloud_formation/nyc-taxi-infra.yaml
-parameters: {}
+parameters:
+  ProjectName: nyc-taxi
+  Env: dev
 tags: {}
