@@ -5,7 +5,7 @@ Description: 'NYC Taxi Project Infrastructure'
 Parameters:
   ProjectName:
     Type: String
-    Default: nyc-taxi
+    Default: nyc-yellow-taxi
     Description: Prefix for S3 buckets
     
   Env:
