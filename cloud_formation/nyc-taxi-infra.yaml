@@ -12,6 +12,15 @@ Parameters:
     Default: dev
     AllowedValues: [dev, stg, prod]
     Description: Environment name to include in bucket names
+  
+  DeployStepFunction:
+    Type: String
+    Default: 'false'
+    AllowedValues: ['true', 'false']
+
+
+Conditions:
+  CreateSF: !Equals [!Ref DeployStepFunction, 'true' ]  
 
 
 Resources:
@@ -209,6 +218,7 @@ Resources:
     Type: 'AWS::StepFunctions::StateMachine'
     DependsOn: 
       - StepFunctionExecutionRole
+    Condition: CreateSF
     Properties:
       StateMachineName: !Sub '${ProjectName}-${Env}-sf'
       RoleArn: !GetAtt StepFunctionExecutionRole.Arn
