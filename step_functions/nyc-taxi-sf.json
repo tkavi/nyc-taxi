@@ -24,12 +24,12 @@
         {
           "Variable": "$.Crawler.State",
           "StringEquals": "READY",
-          "Next": "RunGlueJob"
+          "Next": "RawToProcessed"
         }
       ],
       "Default": "WaitForCrawler"
     },
-    "RunGlueJob": {
+    "RawToProcessed": {
       "Type": "Task",
       "Resource": "arn:aws:states:::glue:startJobRun.sync",
       "Parameters": {
