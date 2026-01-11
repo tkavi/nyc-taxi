@@ -230,7 +230,6 @@ Resources:
         Bucket: !Ref RawBucket
         Key: 'sf_scripts/nyc-taxi-sf.json'
 
-
 Outputs:
   RawBucketName:
     Value: !Ref RawBucket
