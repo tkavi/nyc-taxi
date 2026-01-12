@@ -110,7 +110,9 @@ else:
     # Extracting the Raw Bucket name from PROCESSED_PATH
     raw_bucket_base = args['PROCESSED_PATH'].replace("processed", "raw").split('/')[0:3]
     raw_bucket_url = "/".join(raw_bucket_base)
-    quarantine_path = f"{raw_bucket_base}/quarantine/{run_date}/"
+    quarantine_path = f"{raw_bucket_url}/quarantine/{run_date}/"
+
+    print(f"Final Quarantine Path: {quarantine_path}")
     
     print(f"DQ FAILED. Moving batch of {valid_fares_df.count()} records to {quarantine_path}")
     
