@@ -102,7 +102,7 @@ if failed_count == 0:
         .save(args['PROCESSED_PATH'])
 else:
     print("Printing Failed Rules:")
-    dq_df.filter(col("Outcome") == "Failed").select("Rule", "Description", "Outcome").show()
+    dq_df.filter(col("Outcome") == "Failed").select("EvaluatedMetrics", "FailureReason", "Outcome", "Rule").show()
 
     # Generating a timestamped path for the quarantine folder
     run_date = datetime.datetime.now().strftime("year=%Y/month=%m/day=%d/run=%H%M")
