@@ -4,6 +4,7 @@ import datetime
 from awsglue.utils import getResolvedOptions
 from awsglue.context import GlueContext
 from awsglue.job import Job
+from awsglue.dynamicframe import DynamicFrame
 from awsgluedq.transforms import EvaluateDataQuality
 
 from pyspark.context import SparkContext
@@ -33,11 +34,12 @@ def load_sql(filename):
     return sql_content.strip()
 
 # 1. Standardization
-raw_f = glueContext.create_dynamic_frame.from_catalog(
+raw_dynf = glueContext.create_dynamic_frame.from_catalog(
     database=args['CATALOG_DB'], 
     table_name=args['RAW_TABLE_NAME'])
 
-raw_df = raw_f.toDF()
+# Glue DynamicFrame to Spark DF
+raw_df = raw_dynf.toDF()
 
 raw_df.createOrReplaceTempView("raw_nyc_taxi_data")
 query = load_sql("standardization.sql")
@@ -53,7 +55,10 @@ valid_trips_df = spark.sql(load_sql("valid_trips.sql"))
 valid_trips_df.createOrReplaceTempView("validated_nyc_taxi_data")
 valid_fares_df = spark.sql(load_sql("valid_fares.sql"))
 
-# Data Quality Gat
+# Converting Spark Df back to Glue DynamicFrame
+valid_fares_dynf = DynamicFrame.fromDF(valid_fares_df, glueContext, "valid_fares_dynf")
+
+# Data Quality Gate
 dq_rules = """
     Rules = [
         ColumnValues "vendor_id" in [1, 2, 6, 7],
@@ -67,7 +72,7 @@ dq_rules = """
 
 print("Evaluating Data Quality...")
 dq_results = EvaluateDataQuality.apply(
-    frame = valid_fares_df,
+    frame = valid_fares_dynf,
     ruleset = dq_rules,
     publishing_options = {
         "dataQualityTarget": f"{args['PROCESSED_PATH']}dq_results/",
@@ -76,8 +81,8 @@ dq_results = EvaluateDataQuality.apply(
     }
 )
 
-# CONDITIONAL WRITE (The Governance Gate)
-# Only write to Processed if ALL DQ rules pass.
+# Conditional Write (The Governance Gate)
+# Only writing to Processed if ALL DQ rules pass.
 if dq_results.all_rules_passed:
     print("DQ Passed. Writing as Delta in Processed bucket...")
     valid_fares_df.write \
@@ -86,17 +91,17 @@ if dq_results.all_rules_passed:
         .option("mergeSchema", "true") \
         .save(args['PROCESSED_PATH'])
 else:
-    # 1. Generate a timestamped path for the quarantine folder
+    # Generating a timestamped path for the quarantine folder
     run_date = datetime.datetime.now().strftime("year=%Y/month=%m/day=%d/run=%H%M")
     
-    # 2. Extract the Raw Bucket name from your PROCESSD_PATH
+    # Extracting the Raw Bucket name from PROCESSED_PATH
     raw_bucket_base = args['PROCESSED_PATH'].replace("processed", "raw").split('/')[0:3]
     raw_bucket_url = "/".join(raw_bucket_base)
     quarantine_path = f"{raw_bucket_base}/quarantine/{run_date}/"
     
     print(f"DQ FAILED. Moving batch of {valid_fares_df.count()} records to {quarantine_path}")
     
-    # 3. Write bad data as Parquet so you can analyze it with Athena later
+    # Writing bad data as Parquet to analyze with Athena later
     print("DQ FAILED. Writing to Quarantine and stopping job.")
     valid_fares_df.write \
         .format("parquet") \
