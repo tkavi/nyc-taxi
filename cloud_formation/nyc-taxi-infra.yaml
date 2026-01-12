@@ -35,6 +35,12 @@ Resources:
         ServerSideEncryptionConfiguration:
           - ServerSideEncryptionByDefault:
               SSEAlgorithm: AES256 # Use AES256 (SSE-S3) or aws:kms (SSE-KMS)
+      LifecycleConfiguration:
+        Rules:
+          - Id: AutoDeleteAthenaResults
+            Status: Enabled
+            Prefix: athena_results/
+            ExpirationInDays: 7
   
   ProcessedBucket:
     Type: 'AWS::S3::Bucket'
@@ -199,7 +205,7 @@ Resources:
     Properties:
       Name: !Sub '${ProjectName}-${Env}-raw-to-processed-job'
       Role: !GetAtt GlueServiceRoleNew.Arn
-      GlueVersion: '3.0'
+      GlueVersion: '5.0'
       Command:
         Name: glueetl
         ScriptLocation: !Sub 's3://${ProjectName}-${Env}-raw-${AWS::AccountId}/scripts/glue/raw_to_processed.py'
@@ -223,6 +229,19 @@ Resources:
         '--job-bookmark-option': 'job-bookmark-enable'
       MaxCapacity: 2.0
       Timeout: 5
+
+  # ==== 5. Athena ==== #
+  AthenaPrimaryWorkgroup:
+    Type: AWS::Athena::WorkGroup
+    Properties:
+      Name: primary
+      Description: "Athena Workgroup for NYC Taxi Dev"
+      State: ENABLED
+      WorkGroupConfiguration:
+        ResultConfiguration:
+          OutputLocation: !Sub "s3://${RawBucket}/athena_results/"
+        EnforceWorkGroupConfiguration: true # This overrides user console settings
+        PublishCloudWatchMetricsEnabled: true
 
   # ==== 5. Step Function ==== # 
   NycTaxiStateMachine:

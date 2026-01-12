@@ -56,8 +56,8 @@ valid_trips_df.createOrReplaceTempView("validated_nyc_taxi_data")
 valid_fares_df = spark.sql(load_sql("valid_fares.sql"))
 
 # to view sample data
-for row in valid_fares_df.take(10):
-    print(row.asDict())
+# for row in valid_fares_df.take(10):
+#     print(row.asDict())
 
 # Converting Spark Df back to Glue DynamicFrame
 valid_fares_dynf = DynamicFrame.fromDF(valid_fares_df, glueContext, "valid_fares_dynf")
@@ -102,7 +102,7 @@ if failed_count == 0:
         .save(args['PROCESSED_PATH'])
 else:
     print("Printing Failed Rules:")
-    dq_df.filter(col("Outcome") == "Failed").select("EvaluatedMetrics", "FailureReason", "Outcome", "Rule").show()
+    dq_df.filter(col("Outcome") == "Failed").select("Rule", "FailureReason").show(truncate=False)
 
     # Generating a timestamped path for the quarantine folder
     run_date = datetime.datetime.now().strftime("year=%Y/month=%m/day=%d/run=%H%M")
