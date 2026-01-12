@@ -28,7 +28,9 @@ job.init(args['JOB_NAME'], args)
 # To load SQL from S3
 def load_sql(filename):
     path = f"{args['SQL_DIR']}{filename}"
-    return spark.read.text(path).collect()[0][0]
+    sql_content = sc.wholeTextFiles(path).collect()[0][1]
+    # return spark.read.text(path).collect()[0][0]
+    return sql_content.strip()
 
 # 1. Standardization
 raw_f = glueContext.create_dynamic_frame.from_catalog(
@@ -38,15 +40,18 @@ raw_f = glueContext.create_dynamic_frame.from_catalog(
 raw_df = raw_f.toDF()
 
 raw_df.createOrReplaceTempView("raw_nyc_taxi_data")
-standardized_df = spark.sql(load_sql("standardization.sql").strip())
+query = load_sql("standardization.sql")
+print(f"Executing Query: {query}")
+# standardized_df = spark.sql(load_sql("standardization.sql").strip())
+standardized_df = spark.sql(query)
 
 # 2. Trips Validation
 standardized_df.createOrReplaceTempView("standardized_nyc_taxi_data")
-valid_trips_df = spark.sql(load_sql("valid_trips.sql").strip())
+valid_trips_df = spark.sql(load_sql("valid_trips.sql"))
 
 # 3. Fares Validation
 valid_trips_df.createOrReplaceTempView("validated_nyc_taxi_data")
-valid_fares_df = spark.sql(load_sql("valid_fares.sql").strip())
+valid_fares_df = spark.sql(load_sql("valid_fares.sql"))
 
 # Data Quality Gat
 dq_rules = """
