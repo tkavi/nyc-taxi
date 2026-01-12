@@ -55,6 +55,10 @@ valid_trips_df = spark.sql(load_sql("valid_trips.sql"))
 valid_trips_df.createOrReplaceTempView("validated_nyc_taxi_data")
 valid_fares_df = spark.sql(load_sql("valid_fares.sql"))
 
+# to view sample data
+for row in valid_fares_df.take(10):
+    print(row.asDict())
+
 # Converting Spark Df back to Glue DynamicFrame
 valid_fares_dynf = DynamicFrame.fromDF(valid_fares_df, glueContext, "valid_fares_dynf")
 
@@ -81,9 +85,15 @@ dq_results = EvaluateDataQuality.apply(
     }
 )
 
+# Converting DynamicFrame to Spark Df for easy filtering
+dq_df = dq_results.toDF()
+
+# The 'Outcome' column will contain 'Passed', 'Failed', or 'Error'
+failed_count = dq_df.filter(col("Outcome") == "Failed").count()
+
 # Conditional Write (The Governance Gate)
 # Only writing to Processed if ALL DQ rules pass.
-if dq_results.all_rules_passed:
+if failed_count == 0:
     print("DQ Passed. Writing as Delta in Processed bucket...")
     valid_fares_df.write \
         .format("delta") \
@@ -91,6 +101,9 @@ if dq_results.all_rules_passed:
         .option("mergeSchema", "true") \
         .save(args['PROCESSED_PATH'])
 else:
+    print("Printing Failed Rules:")
+    dq_df.filter(col("Outcome") == "Failed").select("Rule", "Description", "Outcome").show()
+
     # Generating a timestamped path for the quarantine folder
     run_date = datetime.datetime.now().strftime("year=%Y/month=%m/day=%d/run=%H%M")
     
