@@ -280,6 +280,7 @@ Resources:
   # ==== 7.2. Cloudwatch Monitoring ==== #
   CloudwatchDashboard:
     Type: AWS::CloudWatch::Dashboard
+    Condition: CreateSF
     Properties:
       DashboardName: !Sub "${ProjectName}-Monitoring"
       DashboardBody: !Sub |
