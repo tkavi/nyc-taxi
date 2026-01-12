@@ -231,17 +231,16 @@ Resources:
       Timeout: 5
 
   # ==== 5. Athena ==== #
-  AthenaPrimaryWorkgroup:
+  AthenaNycTaxiWorkgroup:
     Type: AWS::Athena::WorkGroup
     Properties:
-      Name: primary
+      Name: nyc_taxi_workgroup
       Description: "Athena Workgroup for NYC Taxi Dev"
       State: ENABLED
       WorkGroupConfiguration:
         ResultConfiguration:
           OutputLocation: !Sub "s3://${RawBucket}/athena_results/"
         EnforceWorkGroupConfiguration: true # This overrides user console settings
-        PublishCloudWatchMetricsEnabled: true
 
   # ==== 5. Step Function ==== # 
   NycTaxiStateMachine:
