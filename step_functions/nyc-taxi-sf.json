@@ -7,17 +7,20 @@
       "Resource": "arn:aws:states:::aws-sdk:glue:startCrawler",
       "Next": "WaitForCrawler"
     },
+    
     "WaitForCrawler": {
       "Type": "Wait",
       "Seconds": 30,
       "Next": "GetCrawlerStatus"
     },
+    
     "GetCrawlerStatus": {
       "Type": "Task",
       "Parameters": { "Name": "${CrawlerName}" },
       "Resource": "arn:aws:states:::aws-sdk:glue:getCrawler",
       "Next": "IsCrawlerDone"
     },
+    
     "IsCrawlerDone": {
       "Type": "Choice",
       "Choices": [
@@ -29,11 +32,37 @@
       ],
       "Default": "WaitForCrawler"
     },
+    
     "RawToProcessed": {
       "Type": "Task",
       "Resource": "arn:aws:states:::glue:startJobRun.sync",
       "Parameters": {
         "JobName": "${GlueJobName}"
+      },
+      "Retry": [
+        {
+          "ErrorEquals": ["Glue.ConcurrentRunsExceededException", "Lambda.TooManyRequestsException"],
+          "IntervalSeconds": 5,
+          "MaxAttempts": 0,
+          "BackoffRate": 2.0
+        }
+      ],
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "Next": "NotifyFailure"
+        }
+      ],
+      "End": true
+    },
+    
+    "NotifyFailure": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::sns:publish",
+      "Parameters": {
+        "TopicArn": "arn:aws:sns:us-east-2:206617159909:nyc-taxi-error-notifications",
+        "Message": "The NYC Taxi Glue Job failed. Check CloudWatch logs for details.",
+        "Subject": "Alert: Pipeline Failure"
       },
       "End": true
     }

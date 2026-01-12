@@ -23,7 +23,7 @@ Conditions:
 
 
 Resources:
-  # --- Storage Layer: S3 Buckets --- #
+  # ==== 1. S3 Buckets ==== #
   RawBucket:
     Type: 'AWS::S3::Bucket'
     DeletionPolicy: Retain
@@ -72,7 +72,7 @@ Resources:
           - ServerSideEncryptionByDefault:
               SSEAlgorithm: AES256
 
-  # --- 2. Metadata Layer: Glue Catalog --- #
+  # ==== 2.1. Metadata Layer: Glue Catalog ==== #
   GlueCatalogDatabase:
     Type: 'AWS::Glue::Database'
     Properties:
@@ -80,7 +80,7 @@ Resources:
       DatabaseInput:
         Name: !Sub '${ProjectName}_${Env}_db'
 
-  # This Crawler scans the CSVs in the Raw bucket and creates the Catalog Table
+  # ==== 2.2. Glue Crawler ==== #
   RawDataCrawler:
     Type: 'AWS::Glue::Crawler'
     Properties:
@@ -95,7 +95,7 @@ Resources:
         UpdateBehavior: 'UPDATE_IN_DATABASE'
         DeleteBehavior: 'LOG'
 
-  # --- Compute Layer: IAM Role for AWS Glue --- #
+  # ==== 3.1. IAM Role for Glue ==== #
   GlueServiceRoleNew:
     Type: 'AWS::IAM::Role'
     DeletionPolicy: Retain
@@ -142,6 +142,7 @@ Resources:
                   - !Sub 'arn:aws:glue:${AWS::Region}:${AWS::AccountId}:database/${ProjectName}_${Env}_db'
                   - !Sub 'arn:aws:glue:${AWS::Region}:${AWS::AccountId}:table/${ProjectName}_${Env}_db/*'
 
+  # ==== 3.2. IAM Role for Step Function ==== #
   StepFunctionExecutionRole:
     Type: 'AWS::IAM::Role'
     Properties:
@@ -157,6 +158,7 @@ Resources:
           PolicyDocument:
             Version: '2012-10-17'
             Statement:
+              # Permissions for Glue
               - Effect: Allow
                 Action:
                   - 'glue:StartCrawler'
@@ -165,8 +167,8 @@ Resources:
                   - 'glue:GetJobRun'
                   - 'glue:GetJobRuns'
                   - 'glue:BatchGetJobs'
-                Resource: '*' # Or narrow down to your specific Job/Crawler ARNs
-                # Permissions to send logsto CloudWatch
+                Resource: '*' 
+                # Permissions to send logs to CloudWatch
               - Effect: Allow
                 Action:
                   - "logs:CreateLogDelivery"
@@ -179,8 +181,19 @@ Resources:
                   - "logs:DescribeResourcePolicies"
                   - "logs:DescribeLogGroups"
                 Resource: "*"
+        # For Sf to talk to SNS
+        - !If
+          - CreateSF        
+          - PolicyName: SNSPublishPolicy
+            PolicyDocument:
+              Version: "2012-10-17"
+              Statement:
+                - Effect: Allow
+                  Action: "sns:Publish"
+                  Resource: !Ref NycTaxiSfErrorTopic
+          - !Ref "AWS::NoValue" # Do ntg if cond is false
 
-  # --- ETL Layer: AWS Glue Job --- #
+  # ==== 4. ETL Layer: AWS Glue Jobs ==== #
   RawToProcessedJob:
     Type: 'AWS::Glue::Job'
     Properties:
@@ -192,15 +205,14 @@ Resources:
         ScriptLocation: !Sub 's3://${ProjectName}-${Env}-raw-${AWS::AccountId}/scripts/glue/raw_to_processed.py'
       ExecutionProperty:
         MaxConcurrentRuns: 1
-      MaxRetries: 0  # <--- Set to 0 to save credits on failure
+      MaxRetries: 0  # Set to 0 to save credits on failure
       DefaultArguments:
-        # These map directly to the sys.argv in your PySpark script
+        # These map to the sys.argv in PySpark script
         '--JOB_NAME': !Sub '${ProjectName}-${Env}-raw-to-processed-job'
         '--RAW_TABLE_NAME': 'raw_landing_files'
         '--CATALOG_DB': !Sub '${ProjectName}_${Env}_db'
         '--SQL_DIR': !Sub 's3://${ProjectName}-${Env}-raw-${AWS::AccountId}/scripts/sql/'
         '--PROCESSED_PATH': !Sub 's3://${ProjectName}-${Env}-processed-${AWS::AccountId}/processed_files/'
-        # Enables Delta Lake format support
         '--datalake-formats': 'delta'
         # Required Spark configuration for Delta extensions
         '--conf': 'spark.sql.extensions=io.delta.sql.DeltaSparkSessionExtension --conf spark.sql.catalog.spark_catalog=org.apache.spark.sql.delta.catalog.DeltaCatalog'
@@ -212,7 +224,7 @@ Resources:
       MaxCapacity: 2.0
       Timeout: 5
 
-  # --- ETL Layer: AWS Glue Job --- # 
+  # ==== 5. Step Function ==== # 
   NycTaxiStateMachine:
     Type: 'AWS::StepFunctions::StateMachine'
     DependsOn: 
@@ -221,15 +233,75 @@ Resources:
     Properties:
       StateMachineName: !Sub '${ProjectName}-${Env}-sf'
       RoleArn: !GetAtt StepFunctionExecutionRole.Arn
-      # Use DefinitionSubstitutions to pass dynamic values into your JSON file
+      # To pass dynamic values into Step Function JSON
       DefinitionSubstitutions:
         CrawlerName: !Ref RawDataCrawler
         GlueJobName: !Ref RawToProcessedJob
-      # This reads the JSON logic from s3 
+      # To read the JSON from s3 
       DefinitionS3Location:
         Bucket: !Ref RawBucket
         Key: 'sf_scripts/nyc-taxi-sf.json'
+  
+  # ==== 6.1. SNS Topic ==== #
+  NycTaxiSfErrorTopic:
+    Type: AWS::SNS::Topic
+    Condition: CreateSF
+    Properties:
+      TopicName: !Sub "${ProjectName}-error-notifications"
 
+  # ==== 6.2. SNS Email Subscription ==== #
+  NycTaxiEmailSubscription:
+    Type: AWS::SNS::Subscription
+    Condition: CreateSF
+    Properties:
+      Endpoint: "tkavita.kavs@gmail.com"
+      Protocol: email
+      TopicArn: !Ref NycTaxiSfErrorTopic
+
+  # ==== 7.1. Cloudwatch Alarm : Sf Failure ==== # 
+  StepFunctionFailedAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Condition: CreateSF
+    Properties:
+      AlarmDescription: "Alarm for the NYC Taxi Pipeline failure"
+      Namespace: "AWS/States"
+      MetricName: "ExecutionsFailed"
+      Dimensions:
+        - Name: "StateMachineArn"
+          Value: !Ref NycTaxiStateMachine
+      Statistic: "Sum"
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: "GreaterThanOrEqualToThreshold"
+      AlarmActions:
+        - !Ref NycTaxiSfErrorTopic
+
+  # ==== 7.2. Cloudwatch Monitoring ==== #
+  CloudwatchDashboard:
+    Type: AWS::CloudWatch::Dashboard
+    Properties:
+      DashboardName: !Sub "${ProjectName}-Monitoring"
+      DashboardBody: !Sub |
+        {
+          "widgets": [
+            {
+              "type": "metric",
+              "x": 0, "y": 0, "width": 12, "height": 6,
+              "properties": {
+                "metrics": [
+                  [ "AWS/States", "ExecutionsSucceeded", "StateMachineArn", "${NycTaxiStateMachine}" ],
+                  [ ".", "ExecutionsFailed", ".", "." ]
+                ],
+                "period": 300,
+                "stat": "Sum",
+                "region": "${AWS::Region}",
+                "title": "Pipeline Success vs Failure"
+              }
+            }
+          ]
+        }
+  
 Outputs:
   RawBucketName:
     Value: !Ref RawBucket

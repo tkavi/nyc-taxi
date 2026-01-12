@@ -25,12 +25,12 @@ spark = glueContext.spark_session
 job = Job(glueContext)
 job.init(args['JOB_NAME'], args)
 
-# --- Helper to load SQL from S3 ---
+# To load SQL from S3
 def load_sql(filename):
     path = f"{args['SQL_DIR']}{filename}"
     return spark.read.text(path).collect()[0][0]
 
-# 1. Cleaning
+# 1. Standardization
 raw_f = glueContext.create_dynamic_frame.from_catalog(
     database=args['CATALOG_DB'], 
     table_name=args['RAW_TABLE_NAME'])
@@ -38,24 +38,31 @@ raw_f = glueContext.create_dynamic_frame.from_catalog(
 raw_df = raw_f.toDF()
 
 raw_df.createOrReplaceTempView("raw_nyc_taxi_data")
-clean_df = spark.sql(load_sql("cleaning.sql"))
+standardized_df = spark.sql(load_sql("standardization.sql").strip())
 
-# 2. Trip Duration and category
-clean_df.createOrReplaceTempView("clean_table")
-final_df = spark.sql(load_sql("trip_duration_ctg.sql"))
+# 2. Trips Validation
+standardized_df.createOrReplaceTempView("standardized_nyc_taxi_data")
+valid_trips_df = spark.sql(load_sql("valid_trips.sql").strip())
 
-# 3. Data Quality Gat
+# 3. Fares Validation
+valid_trips_df.createOrReplaceTempView("validated_nyc_taxi_data")
+valid_fares_df = spark.sql(load_sql("valid_fares.sql").strip())
+
+# Data Quality Gat
 dq_rules = """
     Rules = [
-        ColumnValues "fare" > 0,
-        ColumnValues "trip_distance" > 0,
-        ColumnValues "trip_duration_min" >= 0
+        ColumnValues "vendor_id" in [1, 2, 6, 7],
+        ColumnValues "payment_type_id" <= 6,
+        IsComplete "pickup_location_id",
+        IsComplete "dropoff_location_id",
+        ColumnValues "total_amount" >= 0,
+        ColumnValues "fare_amount" >= 0
     ]
 """
 
 print("Evaluating Data Quality...")
 dq_results = EvaluateDataQuality.apply(
-    frame = final_df,
+    frame = valid_fares_df,
     ruleset = dq_rules,
     publishing_options = {
         "dataQualityTarget": f"{args['PROCESSED_PATH']}dq_results/",
@@ -64,11 +71,11 @@ dq_results = EvaluateDataQuality.apply(
     }
 )
 
-# --- 5. CONDITIONAL WRITE (The Governance Gate) ---
+# CONDITIONAL WRITE (The Governance Gate)
 # Only write to Processed if ALL DQ rules pass.
 if dq_results.all_rules_passed:
     print("DQ Passed. Writing as Delta in Processed bucket...")
-    final_df.write \
+    valid_fares_df.write \
         .format("delta") \
         .mode("overwrite") \
         .option("mergeSchema", "true") \
@@ -82,16 +89,16 @@ else:
     raw_bucket_url = "/".join(raw_bucket_base)
     quarantine_path = f"{raw_bucket_base}/quarantine/{run_date}/"
     
-    print(f"DQ FAILED. Moving {final_df.count()} records to {quarantine_path}")
+    print(f"DQ FAILED. Moving batch of {valid_fares_df.count()} records to {quarantine_path}")
     
     # 3. Write bad data as Parquet so you can analyze it with Athena later
     print("DQ FAILED. Writing to Quarantine and stopping job.")
-    final_df.write \
+    valid_fares_df.write \
         .format("parquet") \
         .mode("append") \
         .save(quarantine_path)
     
     job.commit() # Commit even on failure to record state  
-    sys.exit("Job failed: Data Quality threshold not met. Inspect quarantine folder.")
+    sys.exit("Job failed: Data Quality threshold not met. Batch quarantined. Inspect quarantine folder.")
 
 job.commit()
