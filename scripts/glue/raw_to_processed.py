@@ -98,6 +98,9 @@ if failed_count == 0:
         .format("delta") \
         .mode("overwrite") \
         .option("mergeSchema", "true") \
+        .option("overwriteSchema", "true") \
+        .option("delta.minReaderVersion", "1") \
+        .option("delta.minWriterVersion", "2") \
         .save(args['PROCESSED_PATH'])
 else:
     print("Printing Failed Rules:")
