@@ -65,10 +65,10 @@ valid_fares_dynf = DynamicFrame.fromDF(valid_fares_df, glueContext, "valid_fares
 # Data Quality Gate
 dq_rules = """
     Rules = [
-        ColumnValues "vendor_id" in [1, 2, 6, 7],
-        ColumnValues "payment_type_id" <= 6,
-        IsComplete "pickup_location_id",
-        IsComplete "dropoff_location_id",
+        ColumnValues "vendorid" in [1, 2, 6, 7],
+        ColumnValues "payment_type" <= 6,
+        IsComplete "pulocationid",
+        IsComplete "doocationid",
         ColumnValues "total_amount" >= 0,
         ColumnValues "fare_amount" >= 0
     ]

@@ -6,12 +6,12 @@ SELECT
         WHEN store_and_fwd_flag = 'Y' THEN true 
         WHEN store_and_fwd_flag = 'N' THEN false 
         ELSE NULL 
-    END AS is_store_and_forward,
+    END AS store_and_fwd_flag,
     -- Map RatecodeID 99 to NULL as per dictionary 
     CASE 
         WHEN RatecodeID = 99 THEN NULL 
         ELSE CAST(RatecodeID AS INT) 
-    END AS cleaned_rate_code_id
+    END AS RatecodeID
 FROM raw_nyc_taxi_data
 WHERE 
     -- Authorized TPEP providers: 1, 2, 6, 7 
