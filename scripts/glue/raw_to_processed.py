@@ -27,6 +27,11 @@ spark = glueContext.spark_session
 job = Job(glueContext)
 job.init(args['JOB_NAME'], args)
 
+# Force the Spark session to use legacy Delta protocol for all new tables
+spark.conf.set("spark.databricks.delta.properties.defaults.columnMapping.mode", "none")
+spark.conf.set("spark.databricks.delta.properties.defaults.minReaderVersion", "1")
+spark.conf.set("spark.databricks.delta.properties.defaults.minWriterVersion", "2")
+
 # To load SQL from S3
 def load_sql(filename):
     path = f"{args['SQL_DIR']}{filename}"
@@ -99,6 +104,7 @@ if failed_count == 0:
         .mode("overwrite") \
         .option("mergeSchema", "true") \
         .option("overwriteSchema", "true") \
+        .option("delta.columnMapping.mode", "none") \
         .option("delta.minReaderVersion", "1") \
         .option("delta.minWriterVersion", "2") \
         .save(args['PROCESSED_PATH'])
