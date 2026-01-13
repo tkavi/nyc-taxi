@@ -1,19 +1,36 @@
 -- Step 1: Standardize technical flags and verify Vendor IDs
 SELECT 
-    *,
-    -- Convert Y/N to Boolean as per dictionary store_and_fwd_flag 
-    CASE 
-        WHEN store_and_fwd_flag = 'Y' THEN true 
-        WHEN store_and_fwd_flag = 'N' THEN false 
-        ELSE NULL 
-    END AS store_and_fwd_flag,
+    VendorID,
+    tpep_pickup_datetime,
+    tpep_dropoff_datetime,
+    passenger_count,
+    trip_distance,
     -- Map RatecodeID 99 to NULL as per dictionary 
     CASE 
         WHEN RatecodeID = 99 THEN NULL 
         ELSE CAST(RatecodeID AS INT) 
-    END AS RatecodeID
+    END AS RatecodeID,
+    -- Other value to NULL 
+    CASE 
+        WHEN store_and_fwd_flag = 'Y' THEN 'Y' 
+        WHEN store_and_fwd_flag = 'N' THEN 'N' 
+        ELSE NULL 
+    END AS store_and_fwd_flag,
+    PULocationID,
+    DOLocationID,
+    payment_type,
+    fare_amount,
+    extra,
+    mta_tax,
+    tip_amount,
+    tolls_amount,
+    improvement_surcharge,
+    total_amount,
+    congestion_surcharge,
+    airport_fee,
+    cbd_congestion_fee
 FROM raw_nyc_taxi_data
 WHERE 
-    -- Authorized TPEP providers: 1, 2, 6, 7 
+    -- Authorized TPEP providers
     VendorID IN (1, 2, 6, 7) 
     AND VendorID IS NOT NULL;

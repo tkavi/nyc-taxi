@@ -1,5 +1,6 @@
 import sys
 import datetime
+import boto3
 
 from awsglue.utils import getResolvedOptions
 from awsglue.context import GlueContext
@@ -33,7 +34,7 @@ def load_sql(filename):
     # return spark.read.text(path).collect()[0][0]
     return sql_content.strip()
 
-# 1. Standardization
+# Creating DynamicFrame from Glue table
 raw_dynf = glueContext.create_dynamic_frame.from_catalog(
     database=args['CATALOG_DB'], 
     table_name=args['RAW_TABLE_NAME'])
@@ -41,11 +42,9 @@ raw_dynf = glueContext.create_dynamic_frame.from_catalog(
 # Glue DynamicFrame to Spark DF
 raw_df = raw_dynf.toDF()
 
+# 1. Standardization
 raw_df.createOrReplaceTempView("raw_nyc_taxi_data")
-query = load_sql("standardization.sql")
-print(f"Executing Query: {query}")
-# standardized_df = spark.sql(load_sql("standardization.sql").strip())
-standardized_df = spark.sql(query)
+standardized_df = spark.sql(load_sql("standardization.sql"))
 
 # 2. Trips Validation
 standardized_df.createOrReplaceTempView("standardized_nyc_taxi_data")
@@ -68,13 +67,13 @@ dq_rules = """
         ColumnValues "vendorid" in [1, 2, 6, 7],
         ColumnValues "payment_type" <= 6,
         IsComplete "pulocationid",
-        IsComplete "doocationid",
+        IsComplete "dolocationid",
         ColumnValues "total_amount" >= 0,
         ColumnValues "fare_amount" >= 0
     ]
 """
 
-print("Evaluating Data Quality...")
+print("Evaluating Data Quality")
 dq_results = EvaluateDataQuality.apply(
     frame = valid_fares_dynf,
     ruleset = dq_rules,
@@ -123,6 +122,50 @@ else:
         .mode("append") \
         .save(quarantine_path)
     
+    # To create table in athena
+    athena = boto3.client('athena')
+    
+    create_table = f"""
+    CREATE EXTERNAL TABLE IF NOT EXISTS {args['CATALOG_DB']}.quarantine_data (
+        vendorid INT,
+        tpep_pickup_datetime TIMESTAMP,
+        tpep_dropoff_datetime TIMESTAMP,
+        passenger_count INT,
+        trip_distance DOUBLE,
+        ratecodeid INT,
+        store_and_fwd_flag STRING,
+        PULocationID INT,
+        DOLocationID INT,
+        payment_type INT,
+        fare_amount DOUBLE,
+        extra DOUBLE,
+        mta_tax DOUBLE, 
+        tip_amount DOUBLE,
+        tolls_amount DOUBLE,
+        improvement_surcharge DOUBLE,
+        total_amount DOUBLE,
+        congestion_surcharge DOUBLE,
+        airport_fee DOUBLE,
+        cbd_congestion_fee DOUBLE
+    )
+    PARTITIONED BY (year STRING, month STRING, day STRING, run STRING)
+    STORED AS PARQUET
+    LOCATION '{raw_bucket_url}/quarantine/'
+    """
+
+    athena.start_query_execution(
+        QueryString=create_table,
+        QueryExecutionContext={'Database': args['CATALOG_DB']},
+        ResultConfiguration={'OutputLocation': f"{raw_bucket_url}/athena_results/"}
+    )
+    
+    # To load partitions
+    athena.start_query_execution(
+        QueryString=f"MSCK REPAIR TABLE {args['CATALOG_DB']}.quarantine_data",
+        QueryExecutionContext={'Database': args['CATALOG_DB']},
+        ResultConfiguration={'OutputLocation': f"{raw_bucket_url}/athena_results/"}
+    )
+      
     job.commit() # Commit even on failure to record state  
     sys.exit("Job failed: Data Quality threshold not met. Batch quarantined. Inspect quarantine folder.")
 
