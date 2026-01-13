@@ -32,6 +32,9 @@ spark.conf.set("spark.databricks.delta.properties.defaults.columnMapping.mode", 
 spark.conf.set("spark.databricks.delta.properties.defaults.minReaderVersion", "1")
 spark.conf.set("spark.databricks.delta.properties.defaults.minWriterVersion", "2")
 
+# Disable 'Writer Features' which often trigger Protocol v3
+spark.conf.set("spark.databricks.delta.properties.defaults.writerFeatures", "")
+
 # To load SQL from S3
 def load_sql(filename):
     path = f"{args['SQL_DIR']}{filename}"
