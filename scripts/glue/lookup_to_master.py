@@ -7,6 +7,7 @@ from awsglue.context import GlueContext
 from awsglue.job import Job
 from pyspark.sql import functions as f
 from pyspark.sql.window import Window
+from pyspark.sql.types import DoubleType
 from delta.tables import DeltaTable
 from fuzzywuzzy import fuzz
 
@@ -105,7 +106,7 @@ def get_fuzzy_confidence(name1, name2):
     return float(fuzz.token_set_ratio(str(name1), str(name2)))
 
 # Registering as a UDF for Spark
-fuzzy_udf = f.udf(get_fuzzy_confidence, f.DoubleType())
+fuzzy_udf = f.udf(get_fuzzy_confidence, DoubleType())
 
 # Cross-joining to find similarities - for smaller lists
 matched_vendors = vendors_df.alias("v1").crossJoin(vendors_df.alias("v2")) \
