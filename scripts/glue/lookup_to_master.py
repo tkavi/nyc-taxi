@@ -56,6 +56,7 @@ def upsert_scd2(master_df, target_path, pk_col):
         # Initial Load
         master_df.withColumn("version", f.lit(1)) \
             .write.format("delta").mode("overwrite") \
+            .option("mergeSchema", "true") \
             .option("delta.columnMapping.mode", "none") \
             .option("delta.minReaderVersion", "1") \
             .option("delta.minWriterVersion", "2") \
