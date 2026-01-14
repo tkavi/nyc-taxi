@@ -182,7 +182,7 @@ upsert_scd2(master_ratecodes, ratecode_path, "RatecodeID")
 athena = boto3.client('athena')
 
 def register_table(table_name, path):
-    query = f"CREATE EXTERNAL TABLE IF NOT EXISTS {args['CATALOG_DB']}.{table_name} \
+    query = f"CREATE TABLE IF NOT EXISTS {args['CATALOG_DB']}.{table_name} \
         LOCATION '{path}' \
         TBLPROPERTIES ('table_type'='DELTA');"
     

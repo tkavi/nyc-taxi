@@ -1,11 +1,11 @@
--- Step 1: Standardize technical flags and verify Vendor IDs
+-- Step 1: Standardize 
 SELECT 
     VendorID,
     tpep_pickup_datetime,
     tpep_dropoff_datetime,
     passenger_count,
     trip_distance,
-    -- Map RatecodeID 99 to NULL as per dictionary 
+    -- RatecodeID 99 to NULL as per dictionary 
     CASE 
         WHEN RatecodeID = 99 THEN NULL 
         ELSE CAST(RatecodeID AS INT) 
@@ -31,6 +31,6 @@ SELECT
     cbd_congestion_fee
 FROM raw_nyc_taxi_data
 WHERE 
-    -- Authorized TPEP providers
+    -- Valid TPEP providers
     VendorID IN (1, 2, 6, 7) 
     AND VendorID IS NOT NULL;
