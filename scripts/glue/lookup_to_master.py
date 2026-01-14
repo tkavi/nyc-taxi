@@ -132,6 +132,20 @@ steward_review_df = governance_df.filter("approved_by = 'STEWARD_REVIEW'") \
         f.lit(args['JOB_NAME']).alias("detected_by_job")
     )
 
+# notifying the steward for review
+sns = boto3.client('sns')
+
+def notify_steward(record_count):
+    sns.publish(
+        TopicArn='arn:aws:sns:region:account:StewardAlertTopic',
+        Subject='Manual Data Review Required',
+        Message=f'Job {args["JOB_NAME"]} has flagged {record_count} new vendor records for manual review. Please check the steward_review_vendor table in Athena.'
+    )
+
+# Trigger if records exist in steward_review_df
+if steward_review_df.count() > 0:
+    notify_steward(steward_review_df.count())
+
 # Write to a separate folder for the Steward to see in Athena
 steward_path = f"s3://{args['MASTER_BUCKET']}/steward_review/vendors/"
 steward_review_df.write.format("delta").mode("append").save(steward_path)

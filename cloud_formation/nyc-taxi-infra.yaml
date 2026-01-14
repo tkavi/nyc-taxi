@@ -257,6 +257,34 @@ Resources:
         "--SOURCE_CSV": "lookup_files/taxi_zone_lookup.csv"
         "--conf": "spark.sql.extensions=io.delta.sql.DeltaSparkSessionExtension --conf spark.sql.catalog.spark_catalog=org.apache.spark.sql.delta.catalog.DeltaCatalog"
 
+  StewardReviewJob:
+    Type: AWS::Glue::Job
+    Properties:
+      Name: !Sub "${ProjectName}-${Env}-steward-review-job"
+      Role: !GetAtt GlueServiceRoleNew.Arn
+      GlueVersion: "4.0"
+      NumberOfWorkers: 2
+      WorkerType: G.1X
+      Command:
+        Name: glueetl
+        ScriptLocation: !Sub "s3://${ProjectName}-${Env}-raw-${AWS::AccountId}/scripts/glue/steward_review.py"
+      DefaultArguments:
+        "--MASTER_BUCKET": !Ref MasterBucket
+        "--CATALOG_DB": !Sub "${ProjectName}_${Env}_db"
+
+  # SNS Topic for Steward Review
+  StewardReviewTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: !Sub "${ProjectName}-${Env}-steward-review"
+
+  # SNS Subscription for Steward Review
+  StewardEmailSubscription:
+    Type: AWS::SNS::Subscription
+    Properties:
+      TopicArn: !Ref StewardReviewTopic
+      Protocol: email
+      Endpoint: "tkavita.kavs@gmail.com"
 
   # ==== 5. Athena ==== #
   AthenaNycTaxiWorkgroup:
@@ -288,14 +316,14 @@ Resources:
         Bucket: !Ref RawBucket
         Key: 'sf_scripts/nyc-taxi-sf.json'
   
-  # ==== 6.1. SNS Topic ==== #
+  # ==== 6.1. SNS Topic for SF Failure ==== #
   NycTaxiSfErrorTopic:
     Type: AWS::SNS::Topic
     Condition: CreateSF
     Properties:
       TopicName: !Sub "${ProjectName}-error-notifications"
 
-  # ==== 6.2. SNS Email Subscription ==== #
+  # ==== 6.2. SNS Email Subscription for SF Failure ==== #
   NycTaxiEmailSubscription:
     Type: AWS::SNS::Subscription
     Condition: CreateSF
@@ -304,7 +332,7 @@ Resources:
       Protocol: email
       TopicArn: !Ref NycTaxiSfErrorTopic
 
-  # ==== 7.1. Cloudwatch Alarm : Sf Failure ==== # 
+  # ==== 7.1. Cloudwatch Alarm : SF Failure ==== # 
   StepFunctionFailedAlarm:
     Type: AWS::CloudWatch::Alarm
     Condition: CreateSF
