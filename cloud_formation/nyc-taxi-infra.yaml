@@ -147,6 +147,13 @@ Resources:
                   - !Sub 'arn:aws:glue:${AWS::Region}:${AWS::AccountId}:catalog'
                   - !Sub 'arn:aws:glue:${AWS::Region}:${AWS::AccountId}:database/${ProjectName}_${Env}_db'
                   - !Sub 'arn:aws:glue:${AWS::Region}:${AWS::AccountId}:table/${ProjectName}_${Env}_db/*'
+              # Permissions to call and run Athena queries
+              - Effect: Allow
+                Action:
+                  - athena:StartQueryExecution
+                  - athena:GetQueryExecution
+                  - athena:GetQueryResults
+                Resource: "*"
 
   # ==== 3.2. IAM Role for Step Function ==== #
   StepFunctionExecutionRole:
@@ -229,6 +236,27 @@ Resources:
         '--job-bookmark-option': 'job-bookmark-enable'
       MaxCapacity: 2.0
       Timeout: 5
+  
+  LookupToMasterJob:
+    Type: AWS::Glue::Job
+    Properties:
+      Name: !Sub '${ProjectName}-${Env}-lookup-to-master-job'
+      Role: !GetAtt GlueServiceRoleNew.Arn
+      GlueVersion: "4.0"
+      NumberOfWorkers: 2
+      WorkerType: G.1X
+      Command:
+        Name: glueetl
+        ScriptLocation: !Sub 's3://${ProjectName}-${Env}-raw-${AWS::AccountId}/scripts/glue/lookup_to_master.py'
+      DefaultArguments:
+        "--datalake-formats": "delta"
+        "--additional-python-modules": "fuzzywuzzy,python-Levenshtein"
+        "--RAW_BUCKET": !Ref RawBucket
+        "--MASTER_BUCKET": !Ref MasterBucket
+        "--CATALOG_DB": !Sub '${ProjectName}_${Env}_db'
+        "--SOURCE_CSV": "lookup_files/taxi_zone_lookup.csv"
+        "--conf": "spark.sql.extensions=io.delta.sql.DeltaSparkSessionExtension --conf spark.sql.catalog.spark_catalog=org.apache.spark.sql.delta.catalog.DeltaCatalog"
+
 
   # ==== 5. Athena ==== #
   AthenaNycTaxiWorkgroup:

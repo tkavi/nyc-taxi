@@ -12,7 +12,7 @@ from pyspark.context import SparkContext
 from pyspark.sql.functions import col, unix_timestamp, round, when
 from pyspark.sql import SparkSession
 
-# These arguments are passed from the CloudFormation YAML
+# Arguments from CloudFormation YAML
 args = getResolvedOptions(sys.argv, [
     'JOB_NAME',
     'RAW_TABLE_NAME', 
