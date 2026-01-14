@@ -45,9 +45,9 @@ def upsert_scd2(master_df, target_path, pk_col):
             updated_with_version.alias("source"),
             f"target.{pk_col} = source.{pk_col} AND target.is_current_flag = true"
         ).whenMatchedUpdate(set={
-            "is_current_flag": "false",
-            "effective_to": "source.effective_from",
-            "updated_by": f"'{args['JOB_NAME']}_SCD_UPDATE'"
+            "is_current_flag": f.lit(False),
+            "effective_to": f.col("source.effective_from"),
+            "updated_by": f.col("source.updated_by")
         }).execute()
 
         # 3. Write new records
@@ -77,7 +77,7 @@ master_zones = raw_zones_df.withColumn("rn", f.row_number().over(zone_window)) \
         f.trim(f.col("Borough")).alias("borough"),
         f.trim(f.col("Zone")).alias("zone"),
         f.trim(f.col("service_zone")).alias("service_zone"),
-        f.lit(args['JOB_NAME']).alias("created_by"),
+        f.lit(args['JOB_NAME']).alias("updated_by"),
         f.lit("SYSTEM_AUTO_APPROVED").alias("approved_by"),
         f.current_timestamp().alias("effective_from"),
         f.lit(None).cast("timestamp").alias("effective_to"),
@@ -114,14 +114,14 @@ matched_vendors = vendors_df.alias("v1").crossJoin(vendors_df.alias("v2")) \
     .withColumn("confidence", fuzzy_udf(f.col("v1.vendor_name"), f.col("v2.vendor_name")))
 
 # Governance 
-governance_df = matched_vendors.withColumn("governance_flag", 
-    f.when(f.col("confidence") > 95, "AUTO_MERGE")
+governance_df = matched_vendors.withColumn("approved_by", 
+    f.when(f.col("confidence") > 95, "SYSTEM_AUTO_APPROVED")
      .when(f.col("confidence").between(80, 95), "STEWARD_REVIEW")
      .otherwise("MANUAL_RESOLUTION")
 )
 
 # sending for steward review
-steward_review_df = governance_df.filter("governance_flag = 'STEWARD_REVIEW'") \
+steward_review_df = governance_df.filter("approved_by = 'STEWARD_REVIEW'") \
     .select(
         f.col("v1.vendor_name").alias("source_vendor_name"), 
         f.col("v2.vendor_name").alias("matched_vendor_name"),
@@ -140,7 +140,7 @@ master_vendors = spark.createDataFrame(vendors_data, ["vendorid", "vendor_name"]
     .select(
         f.col("vendorid"),
         f.col("vendor_name"),
-        f.lit(args['JOB_NAME']).alias("created_by"),
+        f.lit(args['JOB_NAME']).alias("updated_by"),
         f.lit("SYSTEM_AUTO_APPROVED").alias("approved_by"),
         f.current_timestamp().alias("effective_from"),
         f.lit(None).cast("timestamp").alias("effective_to"),
@@ -166,7 +166,7 @@ master_ratecodes = spark.createDataFrame(ratecodes_data, ["ratecodeid", "ratecod
     .select(
         f.col("ratecodeid").alias("RatecodeID"),
         f.col("ratecode_desc").alias("Ratecode_desc"),
-        f.lit(args['JOB_NAME']).alias("created_by"),
+        f.lit(args['JOB_NAME']).alias("updated_by"),
         f.lit("SYSTEM_AUTO_APPROVED").alias("approved_by"),
         f.current_timestamp().alias("effective_from"),
         f.lit(None).cast("timestamp").alias("effective_to"),
@@ -181,7 +181,10 @@ upsert_scd2(master_ratecodes, ratecode_path, "RatecodeID")
 athena = boto3.client('athena')
 
 def register_table(table_name, path):
-    query = f"CREATE EXTERNAL TABLE IF NOT EXISTS {args['CATALOG_DB']}.{table_name} LOCATION '{path}' TBLPROPERTIES ('table_type'='DELTA');"
+    query = f"CREATE EXTERNAL TABLE IF NOT EXISTS {args['CATALOG_DB']}.{table_name} \
+        LOCATION '{path}' \
+        TBLPROPERTIES ('table_type'='DELTA');"
+    
     athena.start_query_execution(
         QueryString=query,
         QueryExecutionContext={'Database': args['CATALOG_DB']},
