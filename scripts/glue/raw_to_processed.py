@@ -86,7 +86,7 @@ dq_results = EvaluateDataQuality.apply(
     frame = valid_fares_dynf,
     ruleset = dq_rules,
     publishing_options = {
-        "dataQualityTarget": f"{args['PROCESSED_PATH']}dq_results/",
+        "dataQualityTarget": f"{args['CATALOG_DB']}.raw_to_processed_dq_results",
         "enableDataQualityCloudWatchMetrics": True,
         "enableDataQualityResultsPublishing": True
     }
@@ -98,8 +98,7 @@ dq_df = dq_results.toDF()
 # The 'Outcome' column will contain 'Passed', 'Failed', or 'Error'
 failed_count = dq_df.filter(col("Outcome") == "Failed").count()
 
-# Conditional Write (The Governance Gate)
-# Only writing to Processed if ALL DQ rules pass.
+# Only writing to Processed if All DQ rules pass.
 if failed_count == 0:
     print("DQ Passed. Writing as Delta in Processed bucket...")
     valid_fares_df.write \

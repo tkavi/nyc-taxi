@@ -10,13 +10,9 @@ WHERE
     AND mta_tax >= 0
     AND tolls_amount >= 0
     AND improvement_surcharge >= 0
-    -- A trip with a fare must have a recorded distance 
     AND (CASE WHEN fare_amount > 0 THEN trip_distance > 0 ELSE TRUE END)
-    -- Revenue trips must have at least one passenger 
     AND passenger_count > 0
-    -- Payment types must be within the defined 0-6 range 
+    -- Payment types must be within 0-6 
     AND payment_type BETWEEN 0 AND 6
-    -- New CBD congestion fee (started Jan 2025) must be valid if present 
     AND (cbd_congestion_fee >= 0 OR cbd_congestion_fee IS NULL)
-    -- Congestion surcharge must be non-negative 
     AND congestion_surcharge >= 0;

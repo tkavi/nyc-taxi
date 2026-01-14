@@ -1,4 +1,4 @@
--- Step 2: Validate pickup/dropoff times and taxi zones
+-- Step 2: Validation of Trips
 SELECT *
 FROM standardized_nyc_taxi_data
 WHERE 
