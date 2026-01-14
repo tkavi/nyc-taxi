@@ -101,7 +101,6 @@ vendors_df = spark.createDataFrame(vendors_data, ["vendorid", "vendor_name"])
 
 # Match Confidence
 def get_fuzzy_confidence(name1, name2):
-    """Returns a confidence score 0-100 based on string similarity."""
     if not name1 or not name2: 
         return 0.0
     return float(fuzz.token_set_ratio(str(name1), str(name2)))
@@ -196,14 +195,14 @@ upsert_scd2(master_ratecodes, ratecode_path, "RatecodeID")
 athena = boto3.client('athena')
 
 def register_table(table_name, path):
-    query = f"CREATE TABLE IF NOT EXISTS {args['CATALOG_DB']}.{table_name} \
-        LOCATION '{path}' \
-        TBLPROPERTIES ('table_type'='DELTA');"
+    query = f"CREATE TABLE IF NOT EXISTS `{args['CATALOG_DB']}`.`{table_name}`" \
+        f"LOCATION '{path}'" \
+        f"TBLPROPERTIES ('table_type'='DELTA');"
     
     athena.start_query_execution(
         QueryString=query,
         QueryExecutionContext={'Database': args['CATALOG_DB']},
-        ResultConfiguration={'OutputLocation': f"s3://{args['RAW_BUCKET']}/athena_queries/"}
+        ResultConfiguration={'OutputLocation': f"s3://{args['RAW_BUCKET']}/athena_results/"}
     )
 
 register_table("dim_zones", zone_path)
