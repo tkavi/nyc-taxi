@@ -29,9 +29,9 @@ job = Job(glueContext)
 job.init(args['JOB_NAME'], args)
 
 # Force the Spark session to use legacy Delta protocol for all new tables
-# spark.conf.set("spark.databricks.delta.properties.defaults.columnMapping.mode", "none")
-# spark.conf.set("spark.databricks.delta.properties.defaults.minReaderVersion", "1")
-# spark.conf.set("spark.databricks.delta.properties.defaults.minWriterVersion", "2")
+spark.conf.set("spark.databricks.delta.properties.defaults.columnMapping.mode", "none")
+spark.conf.set("spark.databricks.delta.properties.defaults.minReaderVersion", "1")
+spark.conf.set("spark.databricks.delta.properties.defaults.minWriterVersion", "2")
 
 # Disable 'Writer Features' which often trigger Protocol v3
 # spark.conf.set("spark.databricks.delta.properties.defaults.writerFeatures", "")
@@ -117,9 +117,6 @@ if failed_count == 0:
         .mode("overwrite") \
         .option("mergeSchema", "true") \
         .option("overwriteSchema", "true") \
-        .option("delta.columnMapping.mode", "none") \
-        .option("delta.minReaderVersion", "1") \
-        .option("delta.minWriterVersion", "2") \
         .save(args['PROCESSED_PATH'])
 
     query = f"CREATE EXTERNAL TABLE IF NOT EXISTS `{args['CATALOG_DB']}`.`processed_data`" \
@@ -153,6 +150,7 @@ else:
         .write.format("delta") \
         .mode("append") \
         .option("mergeSchema", "true") \
+        .option("overwriteSchema", "true") \
         .partitionBy("quarantine_run_id") \
         .save(quarantine_path)
     
