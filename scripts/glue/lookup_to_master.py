@@ -17,7 +17,8 @@ args = getResolvedOptions(sys.argv, [
     'RAW_BUCKET',
     'MASTER_BUCKET', 
     'SOURCE_CSV', 
-    'CATALOG_DB'
+    'CATALOG_DB',
+    'SNS_TOPIC_ARN'
 ])
 
 sc = SparkContext()
@@ -136,9 +137,9 @@ sns = boto3.client('sns')
 
 def notify_steward(record_count):
     sns.publish(
-        TopicArn='arn:aws:sns:region:account:StewardAlertTopic',
+        TopicArn=args['SNS_TOPIC_ARN'],
         Subject='Manual Data Review Required',
-        Message=f'Job {args["JOB_NAME"]} has flagged {record_count} new vendor records for manual review. Please check the steward_review_vendor table in Athena.'
+        Message=f'{args["JOB_NAME"]} has {record_count} new vendor records for manual review. Please check the steward_review_vendor table in Athena.'
     )
 
 # Trigger if records exist in steward_review_df
@@ -195,7 +196,7 @@ upsert_scd2(master_ratecodes, ratecode_path, "RatecodeID")
 athena = boto3.client('athena')
 
 def register_table(table_name, path):
-    query = f"CREATE TABLE IF NOT EXISTS `{args['CATALOG_DB']}`.`{table_name}`" \
+    query = f"CREATE EXTERNAL TABLE IF NOT EXISTS `{args['CATALOG_DB']}`.`{table_name}`" \
         f"LOCATION '{path}'" \
         f"TBLPROPERTIES ('table_type'='DELTA');"
     

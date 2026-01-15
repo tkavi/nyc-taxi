@@ -255,6 +255,7 @@ Resources:
         "--MASTER_BUCKET": !Ref MasterBucket
         "--CATALOG_DB": !Sub '${ProjectName}_${Env}_db'
         "--SOURCE_CSV": "lookup_files/taxi_zone_lookup.csv"
+        "--SNS_TOPIC_ARN": !Ref StewardReviewTopic
         "--conf": "spark.sql.extensions=io.delta.sql.DeltaSparkSessionExtension --conf spark.sql.catalog.spark_catalog=org.apache.spark.sql.delta.catalog.DeltaCatalog"
 
   StewardReviewJob:
