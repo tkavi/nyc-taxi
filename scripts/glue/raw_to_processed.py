@@ -9,7 +9,7 @@ from awsglue.dynamicframe import DynamicFrame
 from awsgluedq.transforms import EvaluateDataQuality
 
 from pyspark.context import SparkContext
-from pyspark.sql.functions import col, unix_timestamp, round, when
+from pyspark.sql.functions import col, unix_timestamp, round, when, lit
 from pyspark.sql import SparkSession
 
 # Arguments from CloudFormation YAML
@@ -18,7 +18,8 @@ args = getResolvedOptions(sys.argv, [
     'RAW_TABLE_NAME', 
     'CATALOG_DB', 
     'PROCESSED_PATH', 
-    'SQL_DIR'
+    'SQL_DIR',
+    'RAW_BUCKET'
 ])
 
 sc = SparkContext()
@@ -28,12 +29,12 @@ job = Job(glueContext)
 job.init(args['JOB_NAME'], args)
 
 # Force the Spark session to use legacy Delta protocol for all new tables
-spark.conf.set("spark.databricks.delta.properties.defaults.columnMapping.mode", "none")
-spark.conf.set("spark.databricks.delta.properties.defaults.minReaderVersion", "1")
-spark.conf.set("spark.databricks.delta.properties.defaults.minWriterVersion", "2")
+# spark.conf.set("spark.databricks.delta.properties.defaults.columnMapping.mode", "none")
+# spark.conf.set("spark.databricks.delta.properties.defaults.minReaderVersion", "1")
+# spark.conf.set("spark.databricks.delta.properties.defaults.minWriterVersion", "2")
 
 # Disable 'Writer Features' which often trigger Protocol v3
-spark.conf.set("spark.databricks.delta.properties.defaults.writerFeatures", "")
+# spark.conf.set("spark.databricks.delta.properties.defaults.writerFeatures", "")
 
 # To load SQL from S3
 def load_sql(filename):
@@ -98,6 +99,16 @@ dq_df = dq_results.toDF()
 # The 'Outcome' column will contain 'Passed', 'Failed', or 'Error'
 failed_count = dq_df.filter(col("Outcome") == "Failed").count()
 
+# Function for athena query
+def run_athena_query(query):
+    athena = boto3.client('athena')
+    
+    return athena.start_query_execution(
+        QueryString=query,
+        QueryExecutionContext={'Database': args['CATALOG_DB']},
+        ResultConfiguration={'OutputLocation': f"s3://{args['RAW_BUCKET']}/athena_results/"}
+    )
+
 # Only writing to Processed if All DQ rules pass.
 if failed_count == 0:
     print("DQ Passed. Writing as Delta in Processed bucket...")
@@ -110,72 +121,45 @@ if failed_count == 0:
         .option("delta.minReaderVersion", "1") \
         .option("delta.minWriterVersion", "2") \
         .save(args['PROCESSED_PATH'])
+
+    query = f"CREATE EXTERNAL TABLE IF NOT EXISTS `{args['CATALOG_DB']}`.`processed_data`" \
+        f"LOCATION '{args['PROCESSED_PATH']}'" \
+        f"TBLPROPERTIES ('table_type'='DELTA');"
+    
+    run_athena_query(query)
+
 else:
     print("Printing Failed Rules:")
     dq_df.filter(col("Outcome") == "Failed").select("Rule", "FailureReason").show(truncate=False)
 
     # Generating a timestamped path for the quarantine folder
-    run_date = datetime.datetime.now().strftime("year=%Y/month=%m/day=%d/run=%H%M")
+    # run_date = datetime.datetime.now().strftime("year=%Y/month=%m/day=%d/run=%H%M")
     
     # Extracting the Raw Bucket name from PROCESSED_PATH
-    raw_bucket_base = args['PROCESSED_PATH'].replace("processed", "raw").split('/')[0:3]
-    raw_bucket_url = "/".join(raw_bucket_base)
-    quarantine_path = f"{raw_bucket_url}/quarantine/{run_date}/"
+    # raw_bucket_base = args['PROCESSED_PATH'].replace("processed", "raw").split('/')[0:3]
+    # raw_bucket_url = "/".join(raw_bucket_base)
+            # .partitionBy("year","month","day","run") \
+    run_id = datetime.datetime.now().strftime("%Y%m%d_%H%M")
+    quarantine_path = f"s3://{args['RAW_BUCKET']}/quarantine/"
 
     print(f"Final Quarantine Path: {quarantine_path}")
     
     print(f"DQ FAILED. Moving batch of {valid_fares_df.count()} records to {quarantine_path}")
     
-    # Writing bad data as Parquet to analyze with Athena later
+    # Writing bad data as delta to analyze with Athena later
     print("DQ FAILED. Writing to Quarantine and stopping job.")
-    valid_fares_df.write \
-        .format("parquet") \
+
+    valid_fares_df.withColumn("quarantine_run_id", lit(run_id)) \
+        .write.format("delta") \
         .mode("append") \
+        .option("mergeSchema", "true") \
+        .partitionBy("quarantine_run_id") \
         .save(quarantine_path)
     
-    # To create table in athena
-    athena = boto3.client('athena')
+    query = f"""CREATE EXTERNAL TABLE IF NOT EXISTS `{args['CATALOG_DB']}`.`quarantine_data`
+            LOCATION '{quarantine_path}' TBLPROPERTIES ('table_type'='DELTA');"""  
     
-    create_table = f"""
-    CREATE EXTERNAL TABLE IF NOT EXISTS {args['CATALOG_DB']}.quarantine_data (
-        vendorid INT,
-        tpep_pickup_datetime TIMESTAMP,
-        tpep_dropoff_datetime TIMESTAMP,
-        passenger_count INT,
-        trip_distance DOUBLE,
-        ratecodeid INT,
-        store_and_fwd_flag STRING,
-        PULocationID INT,
-        DOLocationID INT,
-        payment_type INT,
-        fare_amount DOUBLE,
-        extra DOUBLE,
-        mta_tax DOUBLE, 
-        tip_amount DOUBLE,
-        tolls_amount DOUBLE,
-        improvement_surcharge DOUBLE,
-        total_amount DOUBLE,
-        congestion_surcharge DOUBLE,
-        airport_fee DOUBLE,
-        cbd_congestion_fee DOUBLE
-    )
-    PARTITIONED BY (year STRING, month STRING, day STRING, run STRING)
-    STORED AS PARQUET
-    LOCATION '{raw_bucket_url}/quarantine/'
-    """
-
-    athena.start_query_execution(
-        QueryString=create_table,
-        QueryExecutionContext={'Database': args['CATALOG_DB']},
-        ResultConfiguration={'OutputLocation': f"{raw_bucket_url}/athena_results/"}
-    )
-    
-    # To load partitions
-    athena.start_query_execution(
-        QueryString=f"MSCK REPAIR TABLE {args['CATALOG_DB']}.quarantine_data",
-        QueryExecutionContext={'Database': args['CATALOG_DB']},
-        ResultConfiguration={'OutputLocation': f"{raw_bucket_url}/athena_results/"}
-    )
+    run_athena_query(query)
       
     job.commit() # Commit even on failure to record state  
     sys.exit("Job failed: Data Quality threshold not met. Batch quarantined. Inspect quarantine folder.")

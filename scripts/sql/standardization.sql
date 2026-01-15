@@ -3,7 +3,7 @@ SELECT
     VendorID,
     tpep_pickup_datetime,
     tpep_dropoff_datetime,
-    passenger_count,
+    CAST(passenger_count AS INT) AS passenger_count,
     trip_distance,
     -- RatecodeID 99 to NULL as per dictionary 
     CASE 
@@ -12,13 +12,13 @@ SELECT
     END AS RatecodeID,
     -- Other value to NULL 
     CASE 
-        WHEN store_and_fwd_flag = 'Y' THEN 'Y' 
-        WHEN store_and_fwd_flag = 'N' THEN 'N' 
+        WHEN TRIM(UPPER(store_and_fwd_flag)) = 'Y' THEN 'Y' 
+        WHEN TRIM(UPPER(store_and_fwd_flag)) = 'N' THEN 'N' 
         ELSE NULL 
     END AS store_and_fwd_flag,
     PULocationID,
     DOLocationID,
-    payment_type,
+    CAST(payment_type AS INT) AS payment_type,
     fare_amount,
     extra,
     mta_tax,

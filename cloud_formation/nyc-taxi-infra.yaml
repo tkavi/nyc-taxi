@@ -212,7 +212,7 @@ Resources:
     Properties:
       Name: !Sub '${ProjectName}-${Env}-raw-to-processed-job'
       Role: !GetAtt GlueServiceRoleNew.Arn
-      GlueVersion: '5.0'
+      GlueVersion: "4.0"
       Command:
         Name: glueetl
         ScriptLocation: !Sub 's3://${ProjectName}-${Env}-raw-${AWS::AccountId}/scripts/glue/raw_to_processed.py'
@@ -226,6 +226,7 @@ Resources:
         '--CATALOG_DB': !Sub '${ProjectName}_${Env}_db'
         '--SQL_DIR': !Sub 's3://${ProjectName}-${Env}-raw-${AWS::AccountId}/scripts/sql/'
         '--PROCESSED_PATH': !Sub 's3://${ProjectName}-${Env}-processed-${AWS::AccountId}/processed_files/'
+        "--RAW_BUCKET": !Ref RawBucket
         '--datalake-formats': 'delta'
         # Required Spark configuration for Delta extensions
         '--conf': 'spark.sql.extensions=io.delta.sql.DeltaSparkSessionExtension --conf spark.sql.catalog.spark_catalog=org.apache.spark.sql.delta.catalog.DeltaCatalog'
