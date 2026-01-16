@@ -235,7 +235,7 @@ Resources:
               # Permissions to trigger Glue Job
               - Effect: Allow
                 Action: glue:StartJobRun
-                Resource: !Sub "arn:aws:glue:${AWS::Region}:${AWS::AccountId}:${LookupToMasterJob}"
+                Resource: !Sub "arn:${AWS::Partition}:glue:${AWS::Region}:${AWS::AccountId}:job/${LookupToMasterJob}"
 
   # ==== 3.4 Resource Policy ==== #
   SnsTopicPolicy:
