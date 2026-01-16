@@ -80,6 +80,9 @@ Resources:
         ServerSideEncryptionConfiguration:
           - ServerSideEncryptionByDefault:
               SSEAlgorithm: AES256
+      NotificationConfiguration:
+        EventBridgeConfiguration:
+          EventBridgeEnabled: true
 
   # ==== 2.1. Metadata Layer: Glue Catalog ==== #
   GlueCatalogDatabase:
@@ -197,7 +200,7 @@ Resources:
                   - "logs:DescribeResourcePolicies"
                   - "logs:DescribeLogGroups"
                 Resource: "*"
-        # Permissions for Sf to trigger SNS
+        # Permissions for Sf to trigger SNS (moved to eventbridge rule - not required)
         - !If
           - CreateSF        
           - PolicyName: SNSPublishPolicy
@@ -210,9 +213,8 @@ Resources:
           - !Ref "AWS::NoValue" # Do ntg if cond is false
 
   # ==== 3.3 IAM Role for EventBridge ==== #
-  EventBridgeStepFunctionRole:
+  EventBridgeExecutionRole:
     Type: AWS::IAM::Role
-    Condition: CreateSF
     Properties:
       AssumeRolePolicyDocument:
         Version: "2012-10-17"
@@ -221,15 +223,19 @@ Resources:
             Principal:
               Service: events.amazonaws.com
             Action: sts:AssumeRole
-      Policies:
-        - PolicyName: ExecuteStepFunction
+      Policies:     
+        - PolicyName: EventbridgeRules
           PolicyDocument:
             Version: "2012-10-17"
             Statement:
-              # Permissions to trigger Step Functions
+              # Permissions to trigger Step Functions         
               - Effect: Allow
                 Action: states:StartExecution
-                Resource: !Ref NycTaxiStateMachine
+                Resource: !If [CreateSF, !Ref NycTaxiStateMachine, "arn:aws:states:*:*:stateMachine:*"]
+              # Permissions to trigger Glue Job
+              - Effect: Allow
+                Action: glue:StartJobRun
+                Resource: !Sub "arn:aws:glue:${AWS::Region}:${AWS::AccountId}:job/${LookupToMasterJob}"
 
   # ==== 3.4 Resource Policy ==== #
   SnsTopicPolicy:
@@ -422,7 +428,7 @@ Resources:
       Targets:
         - Arn: !Ref NycTaxiStateMachine
           Id: "NycTaxiSfTarget"
-          RoleArn: !GetAtt EventBridgeStepFunctionRole.Arn
+          RoleArn: !GetAtt EventBridgeExecutionRole.Arn
 
   # ==== 6.2 EventBridge : SF Failure ==== #
   StepFunctionFailureRule:
@@ -446,7 +452,29 @@ Resources:
       Targets:
         - Arn: !Ref NycTaxiSfErrorTopic
           Id: "SendToSNS"
-          
+
+  # ==== 6.3 EventBridge :  Trigger Master Job on CSV upload ==== #
+  S3ToMasterJobRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Description: "Trigger Master Glue Job when lookup CSV is uploaded"
+      State: ENABLED
+      EventPattern:
+        source:
+          - aws.s3
+        detail-type:
+          - "Object Created"
+        detail:
+          bucket:
+            name:
+              - !Sub '${ProjectName}-${Env}-master-${AWS::AccountId}'
+          object:
+            key:
+              - prefix: "lookup_files/" 
+      Targets:
+        - Arn: !Sub "arn:aws:glue:${AWS::Region}:${AWS::AccountId}:job/${ProjectName}-${Env}-lookup-to-master-job"
+          Id: "MasterJobTarget"
+          RoleArn: !GetAtt EventBridgeExecutionRole.Arn       
 
   # ==== 7.1. SNS Topic for SF Failure ==== #
   NycTaxiSfErrorTopic:
