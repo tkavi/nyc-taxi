@@ -219,9 +219,11 @@ Resources:
       ExecutionProperty:
         MaxConcurrentRuns: 1
       MaxRetries: 0  # Set to 0 to save credits on failure
+      MaxCapacity: 2.0
+      Timeout: 5
       DefaultArguments:
         # These map to the sys.argv in PySpark script
-        '--JOB_NAME': !Sub '${ProjectName}-${Env}-raw-to-processed-job'
+        '--JOB_NAME': 'raw-to-processed'
         '--RAW_TABLE_NAME': 'raw_landing_files'
         '--CATALOG_DB': !Sub '${ProjectName}_${Env}_db'
         '--SQL_DIR': !Sub 's3://${ProjectName}-${Env}-raw-${AWS::AccountId}/scripts/sql/'
@@ -235,8 +237,6 @@ Resources:
         '--enable-metrics': 'true'                   # Basic CloudWatch metrics
         '--enable-observability-metrics': 'true'     # Advanced visual monitoring
         '--job-bookmark-option': 'job-bookmark-enable'
-      MaxCapacity: 2.0
-      Timeout: 5
   
   LookupToMasterJob:
     Type: AWS::Glue::Job
@@ -249,14 +249,45 @@ Resources:
       Command:
         Name: glueetl
         ScriptLocation: !Sub 's3://${ProjectName}-${Env}-raw-${AWS::AccountId}/scripts/glue/lookup_to_master.py'
+      ExecutionProperty:
+        MaxConcurrentRuns: 1
+      MaxRetries: 0
+      MaxCapacity: 2.0
+      Timeout: 5
       DefaultArguments:
         "--datalake-formats": "delta"
         "--additional-python-modules": "fuzzywuzzy,python-Levenshtein"
+        '--JOB_NAME': 'lookup-to-master'
         "--RAW_BUCKET": !Ref RawBucket
         "--MASTER_BUCKET": !Ref MasterBucket
         "--CATALOG_DB": !Sub '${ProjectName}_${Env}_db'
         "--SOURCE_CSV": "lookup_files/taxi_zone_lookup.csv"
         "--SNS_TOPIC_ARN": !Ref StewardReviewTopic
+        "--conf": "spark.sql.extensions=io.delta.sql.DeltaSparkSessionExtension --conf spark.sql.catalog.spark_catalog=org.apache.spark.sql.delta.catalog.DeltaCatalog"
+
+  ProcessedToCuratedJob:
+    Type: AWS::Glue::Job
+    Properties:
+      Name: !Sub '${ProjectName}-${Env}-processed-to-curated-job'
+      Role: !GetAtt GlueServiceRoleNew.Arn
+      GlueVersion: "4.0"
+      NumberOfWorkers: 2
+      WorkerType: G.1X
+      Command:
+        Name: glueetl
+        ScriptLocation: !Sub 's3://${ProjectName}-${Env}-raw-${AWS::AccountId}/scripts/glue/processed_to_curated.py'
+      ExecutionProperty:
+        MaxConcurrentRuns: 1
+      MaxRetries: 0
+      MaxCapacity: 2.0
+      Timeout: 5
+      DefaultArguments:
+        "--datalake-formats": "delta"
+        '--JOB_NAME': 'processed-to-curated'
+        "--RAW_BUCKET": !Ref RawBucket
+        "--PROCESSED_BUCKET": !Ref ProcessedBucket
+        "--CURATED_BUCKET": !Ref ProcessedBucket
+        "--CATALOG_DB": !Sub '${ProjectName}_${Env}_db'
         "--conf": "spark.sql.extensions=io.delta.sql.DeltaSparkSessionExtension --conf spark.sql.catalog.spark_catalog=org.apache.spark.sql.delta.catalog.DeltaCatalog"
 
   StewardReviewJob:
