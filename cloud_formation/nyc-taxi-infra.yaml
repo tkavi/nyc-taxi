@@ -472,7 +472,7 @@ Resources:
             key:
               - prefix: "lookup_files/" 
       Targets:
-        - Arn: !Sub "arn:aws:glue:${AWS::Region}:${AWS::AccountId}:job/${ProjectName}-${Env}-lookup-to-master-job"
+        - Arn: !Ref LookupToMasterJob
           Id: "MasterJobTarget"
           RoleArn: !GetAtt EventBridgeExecutionRole.Arn       
 

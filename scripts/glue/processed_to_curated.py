@@ -44,7 +44,7 @@ vendors_df= spark.read.format("delta") \
 ratecodes_df = spark.read.format("delta") \
     .load(f"s3://{args['MASTER_BUCKET']}/dim_ratecodes/") \
     .filter(f.col("is_current_flag") == True) \
-    .select(f.col("ratecode_id"), "ratecode_desc") \
+    .select(f.col("ratecodeid").alias("ratecode_id"), "ratecode_desc") \
     .cache()
 
 # Business Transformations
