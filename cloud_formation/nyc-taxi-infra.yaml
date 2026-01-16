@@ -453,7 +453,7 @@ Resources:
         - Arn: !Ref NycTaxiSfErrorTopic
           Id: "SendToSNS"
 
-  # ==== 6.3 EventBridge :  Trigger Master Job on CSV upload ==== #
+  # ==== 6.3 EventBridge : Trigger Master Job on CSV upload ==== #
   S3ToMasterJobRule:
     Type: AWS::Events::Rule
     Properties:
@@ -472,7 +472,7 @@ Resources:
             key:
               - prefix: "lookup_files/" 
       Targets:
-        - Arn: !Sub "arn:aws:glue:${AWS::Region}:${AWS::AccountId}:${LookupToMasterJob}"
+        - Arn: !Sub "arn:${AWS::Partition}:glue:${AWS::Region}:${AWS::AccountId}:job/${LookupToMasterJob}"
           Id: "MasterJobTarget"
           RoleArn: !GetAtt EventBridgeExecutionRole.Arn
 
