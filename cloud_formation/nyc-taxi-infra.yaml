@@ -232,17 +232,6 @@ Resources:
               - Effect: Allow
                 Action: states:StartExecution
                 Resource: !If [CreateSF, !Ref NycTaxiStateMachine, "arn:aws:states:*:*:stateMachine:*"]
-              # Permissions to trigger Glue Job
-              - Effect: Allow
-                Action: glue:StartJobRun
-                Resource: !Sub "arn:${AWS::Partition}:glue:${AWS::Region}:${AWS::AccountId}:job/${LookupToMasterJob}"
-              # Permission to pass the Glue Role
-              - Effect: Allow
-                Action: iam:PassRole
-                Resource: !GetAtt GlueServiceRoleNew.Arn
-                Condition:
-                  StringLike:
-                    iam:PassedToService: glue.amazonaws.com
 
   # ==== 3.4 Resource Policy ==== #
   SnsTopicPolicy:
@@ -459,29 +448,6 @@ Resources:
       Targets:
         - Arn: !Ref NycTaxiSfErrorTopic
           Id: "SendToSNS"
-
-  # ==== 6.3 EventBridge : Trigger Master Job on CSV upload ==== #
-  S3ToMasterJobRule:
-    Type: AWS::Events::Rule
-    Properties:
-      Description: "Trigger Master Glue Job when lookup CSV is uploaded"
-      State: ENABLED
-      EventPattern:
-        source:
-          - aws.s3
-        detail-type:
-          - "Object Created"
-        detail:
-          bucket:
-            name:
-              - !Sub '${ProjectName}-${Env}-master-${AWS::AccountId}'
-          object:
-            key:
-              - prefix: "lookup_files/" 
-      Targets:
-        - Arn: !Sub "arn:${AWS::Partition}:glue:${AWS::Region}:${AWS::AccountId}:job/${LookupToMasterJob}"
-          Id: "MasterJobTarget"
-          RoleArn: !GetAtt EventBridgeExecutionRole.Arn
 
   # ==== 7.1. SNS Topic for SF Failure ==== #
   NycTaxiSfErrorTopic:
