@@ -236,6 +236,13 @@ Resources:
               - Effect: Allow
                 Action: glue:StartJobRun
                 Resource: !Sub "arn:${AWS::Partition}:glue:${AWS::Region}:${AWS::AccountId}:job/${LookupToMasterJob}"
+              # Permission to pass the Glue Role
+              - Effect: Allow
+                Action: iam:PassRole
+                Resource: !GetAtt GlueServiceRoleNew.Arn
+                Condition:
+                  StringLike:
+                    iam:PassedToService: glue.amazonaws.com
 
   # ==== 3.4 Resource Policy ==== #
   SnsTopicPolicy:
