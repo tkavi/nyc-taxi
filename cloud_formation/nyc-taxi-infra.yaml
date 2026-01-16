@@ -472,7 +472,7 @@ Resources:
             key:
               - prefix: "lookup_files/" 
       Targets:
-        - Arn: !Ref LookupToMasterJob
+        - Arn: !Sub "arn:aws:glue:${AWS::Region}:${AWS::AccountId}:job/${LookupToMasterJob}"
           Id: "MasterJobTarget"
           RoleArn: !GetAtt EventBridgeExecutionRole.Arn       
 
@@ -548,6 +548,8 @@ Outputs:
     Value: !Ref CuratedBucket
   GlueDatabaseName:
     Value: !Ref GlueCatalogDatabase
+  MasterGlueJob:
+    Value: !Ref LookupToMasterJob
   GlueJobName1:
     Value: !Ref RawToProcessedJob
   GlueJobName2:
