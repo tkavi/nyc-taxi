@@ -235,7 +235,7 @@ Resources:
               # Permissions to trigger Glue Job
               - Effect: Allow
                 Action: glue:StartJobRun
-                Resource: !Sub "arn:aws:glue:${AWS::Region}:${AWS::AccountId}:job/${LookupToMasterJob}"
+                Resource: !Sub "arn:aws:glue:${AWS::Region}:${AWS::AccountId}:${LookupToMasterJob}"
 
   # ==== 3.4 Resource Policy ==== #
   SnsTopicPolicy:
@@ -472,9 +472,9 @@ Resources:
             key:
               - prefix: "lookup_files/" 
       Targets:
-        - Arn: !Sub "arn:aws:glue:${AWS::Region}:${AWS::AccountId}:job/${LookupToMasterJob}"
+        - Arn: !Sub "arn:aws:glue:${AWS::Region}:${AWS::AccountId}:${LookupToMasterJob}"
           Id: "MasterJobTarget"
-          RoleArn: !GetAtt EventBridgeExecutionRole.Arn       
+          RoleArn: !GetAtt EventBridgeExecutionRole.Arn
 
   # ==== 7.1. SNS Topic for SF Failure ==== #
   NycTaxiSfErrorTopic:
