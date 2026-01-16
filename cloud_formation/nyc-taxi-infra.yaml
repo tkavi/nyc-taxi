@@ -255,15 +255,34 @@ Resources:
       MaxCapacity: 2.0
       Timeout: 5
       DefaultArguments:
-        "--datalake-formats": "delta"
-        "--additional-python-modules": "fuzzywuzzy,python-Levenshtein"
         '--JOB_NAME': 'lookup-to-master'
         "--RAW_BUCKET": !Ref RawBucket
         "--MASTER_BUCKET": !Ref MasterBucket
         "--CATALOG_DB": !Sub '${ProjectName}_${Env}_db'
         "--SOURCE_CSV": "lookup_files/taxi_zone_lookup.csv"
         "--SNS_TOPIC_ARN": !Ref StewardReviewTopic
+        "--datalake-formats": "delta"
+        "--additional-python-modules": "fuzzywuzzy,python-Levenshtein"
+        '--enable-continuous-cloudwatch-log': 'true' 
+        '--enable-metrics': 'true'                   
+        '--enable-observability-metrics': 'true' 
+        '--job-bookmark-option': 'job-bookmark-enable'
         "--conf": "spark.sql.extensions=io.delta.sql.DeltaSparkSessionExtension --conf spark.sql.catalog.spark_catalog=org.apache.spark.sql.delta.catalog.DeltaCatalog"
+
+  StewardReviewJob:
+    Type: AWS::Glue::Job
+    Properties:
+      Name: !Sub "${ProjectName}-${Env}-steward-review-job"
+      Role: !GetAtt GlueServiceRoleNew.Arn
+      GlueVersion: "4.0"
+      NumberOfWorkers: 2
+      WorkerType: G.1X
+      Command:
+        Name: glueetl
+        ScriptLocation: !Sub "s3://${ProjectName}-${Env}-raw-${AWS::AccountId}/scripts/glue/steward_review.py"
+      DefaultArguments:
+        "--MASTER_BUCKET": !Ref MasterBucket
+        "--CATALOG_DB": !Sub "${ProjectName}_${Env}_db"
 
   ProcessedToCuratedJob:
     Type: AWS::Glue::Job
@@ -282,28 +301,17 @@ Resources:
       MaxCapacity: 2.0
       Timeout: 5
       DefaultArguments:
-        "--datalake-formats": "delta"
         '--JOB_NAME': 'processed-to-curated'
         "--RAW_BUCKET": !Ref RawBucket
         "--PROCESSED_BUCKET": !Ref ProcessedBucket
-        "--CURATED_BUCKET": !Ref ProcessedBucket
+        "--CURATED_BUCKET": !Ref CuratedBucket
         "--CATALOG_DB": !Sub '${ProjectName}_${Env}_db'
+        "--datalake-formats": "delta"
+        '--enable-continuous-cloudwatch-log': 'true'
+        '--enable-metrics': 'true'                   
+        '--enable-observability-metrics': 'true'     
+        '--job-bookmark-option': 'job-bookmark-enable'
         "--conf": "spark.sql.extensions=io.delta.sql.DeltaSparkSessionExtension --conf spark.sql.catalog.spark_catalog=org.apache.spark.sql.delta.catalog.DeltaCatalog"
-
-  StewardReviewJob:
-    Type: AWS::Glue::Job
-    Properties:
-      Name: !Sub "${ProjectName}-${Env}-steward-review-job"
-      Role: !GetAtt GlueServiceRoleNew.Arn
-      GlueVersion: "4.0"
-      NumberOfWorkers: 2
-      WorkerType: G.1X
-      Command:
-        Name: glueetl
-        ScriptLocation: !Sub "s3://${ProjectName}-${Env}-raw-${AWS::AccountId}/scripts/glue/steward_review.py"
-      DefaultArguments:
-        "--MASTER_BUCKET": !Ref MasterBucket
-        "--CATALOG_DB": !Sub "${ProjectName}_${Env}_db"
 
   # SNS Topic for Steward Review
   StewardReviewTopic:

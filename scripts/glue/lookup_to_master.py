@@ -146,7 +146,7 @@ def notify_steward(record_count):
 if steward_review_df.count() > 0:
     notify_steward(steward_review_df.count())
 
-# Write to a separate folder for the Steward to see in Athena
+# Write to a separate folder for the Steward to review in Athena
 steward_path = f"s3://{args['MASTER_BUCKET']}/steward_review/vendors/"
 steward_review_df.write.format("delta").mode("append").save(steward_path)
 
