@@ -11,6 +11,7 @@ args = getResolvedOptions(sys.argv, [
     'JOB_NAME', 
     'CATALOG_DB', 
     'PROCESSED_BUCKET', 
+    'MASTER_BUCKET',
     'CURATED_BUCKET',   
     'RAW_BUCKET'
 ])
@@ -30,18 +31,18 @@ spark.conf.set("spark.databricks.delta.properties.defaults.minWriterVersion", "2
 processed_df = spark.read.format("delta").load(f"s3://{args['PROCESSED_BUCKET']}/processed_files/").cache()
 
 zones_df = spark.read.format("delta") \
-    .load(f"s3://{args['CURATED_BUCKET']}/dim_zones/") \
+    .load(f"s3://{args['MASTER_BUCKET']}/dim_zones/") \
     .filter(f.col("is_current_flag") == True) \
     .cache()
 
 vendors_df= spark.read.format("delta") \
-    .load(f"s3://{args['CURATED_BUCKET']}/dim_vendors/") \
+    .load(f"s3://{args['MASTER_BUCKET']}/dim_vendors/") \
     .filter(f.col("is_current_flag") == True) \
     .select(f.col("vendorid").alias("vendor_id"), "vendor_name") \
     .cache()
 
 ratecodes_df = spark.read.format("delta") \
-    .load(f"s3://{args['CURATED_BUCKET']}/dim_ratecodes/") \
+    .load(f"s3://{args['MASTER_BUCKET']}/dim_ratecodes/") \
     .filter(f.col("is_current_flag") == True) \
     .select(f.col("ratecode_id"), "ratecode_desc") \
     .cache()

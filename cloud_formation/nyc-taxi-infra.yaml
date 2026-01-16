@@ -345,6 +345,7 @@ Resources:
         '--JOB_NAME': 'processed-to-curated'
         "--RAW_BUCKET": !Ref RawBucket
         "--PROCESSED_BUCKET": !Ref ProcessedBucket
+        "--MASTER_BUCKET": !Ref MasterBucket
         "--CURATED_BUCKET": !Ref CuratedBucket
         "--CATALOG_DB": !Sub '${ProjectName}_${Env}_db'
         "--datalake-formats": "delta"
@@ -513,10 +514,16 @@ Outputs:
     Value: !Ref RawBucket
   ProcessedBucketName:
     Value: !Ref ProcessedBucket
+  MasterBucketName:
+    Value: !Ref MasterBucket
+  CuratedBucketName:
+    Value: !Ref CuratedBucket
   GlueDatabaseName:
     Value: !Ref GlueCatalogDatabase
-  GlueJobName:
+  GlueJobName1:
     Value: !Ref RawToProcessedJob
+  GlueJobName2:
+    Value: !Ref ProcessedToCuratedJob
   StateMachineArn:
     Value: !Ref NycTaxiStateMachine
     Condition: CreateSF
