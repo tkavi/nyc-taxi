@@ -41,6 +41,9 @@ Resources:
             Status: Enabled
             Prefix: athena_results/
             ExpirationInDays: 7
+      NotificationConfiguration:
+        EventBridgeConfiguration:
+          EventBridgeEnabled: true
   
   ProcessedBucket:
     Type: 'AWS::S3::Bucket'
@@ -171,7 +174,7 @@ Resources:
           PolicyDocument:
             Version: '2012-10-17'
             Statement:
-              # Permissions for Glue
+              # Permissions to trigger Glue
               - Effect: Allow
                 Action:
                   - 'glue:StartCrawler'
@@ -194,7 +197,7 @@ Resources:
                   - "logs:DescribeResourcePolicies"
                   - "logs:DescribeLogGroups"
                 Resource: "*"
-        # For Sf to talk to SNS
+        # Permissions for Sf to trigger SNS
         - !If
           - CreateSF        
           - PolicyName: SNSPublishPolicy
@@ -206,6 +209,45 @@ Resources:
                   Resource: !Ref NycTaxiSfErrorTopic
           - !Ref "AWS::NoValue" # Do ntg if cond is false
 
+  # ==== 3.3 IAM Role for EventBridge ==== #
+  EventBridgeStepFunctionRole:
+    Type: AWS::IAM::Role
+    Condition: CreateSF
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: events.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: ExecuteStepFunction
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              # Permissions to trigger Step Functions
+              - Effect: Allow
+                Action: states:StartExecution
+                Resource: !Ref NycTaxiStateMachine
+
+  # ==== 3.4 Resource Policy ==== #
+  SnsTopicPolicy:
+    Type: AWS::SNS::TopicPolicy
+    Condition: CreateSF
+    Properties:
+      Topics:
+        - !Ref NycTaxiSfErrorTopic
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          # Permission for EventBridge to Publish to SNS
+          - Effect: Allow
+            Principal:
+              Service: "events.amazonaws.com"
+            Action: "sns:Publish"
+            Resource: !Ref NycTaxiSfErrorTopic
+
   # ==== 4. ETL Layer: AWS Glue Jobs ==== #
   RawToProcessedJob:
     Type: 'AWS::Glue::Job'
@@ -213,13 +255,14 @@ Resources:
       Name: !Sub '${ProjectName}-${Env}-raw-to-processed-job'
       Role: !GetAtt GlueServiceRoleNew.Arn
       GlueVersion: "4.0"
+      NumberOfWorkers: 2
+      WorkerType: G.1X
       Command:
         Name: glueetl
         ScriptLocation: !Sub 's3://${ProjectName}-${Env}-raw-${AWS::AccountId}/scripts/glue/raw_to_processed.py'
       ExecutionProperty:
         MaxConcurrentRuns: 1
       MaxRetries: 0  # Set to 0 to save credits on failure
-      MaxCapacity: 2.0
       Timeout: 5
       DefaultArguments:
         # These map to the sys.argv in PySpark script
@@ -252,7 +295,6 @@ Resources:
       ExecutionProperty:
         MaxConcurrentRuns: 1
       MaxRetries: 0
-      MaxCapacity: 2.0
       Timeout: 5
       DefaultArguments:
         '--JOB_NAME': 'lookup-to-master'
@@ -298,7 +340,6 @@ Resources:
       ExecutionProperty:
         MaxConcurrentRuns: 1
       MaxRetries: 0
-      MaxCapacity: 2.0
       Timeout: 5
       DefaultArguments:
         '--JOB_NAME': 'processed-to-curated'
@@ -351,20 +392,69 @@ Resources:
       # To pass dynamic values into Step Function JSON
       DefinitionSubstitutions:
         CrawlerName: !Ref RawDataCrawler
-        GlueJobName: !Ref RawToProcessedJob
+        GlueJobName1: !Ref RawToProcessedJob
+        GlueJobName2: !Ref ProcessedToCuratedJob
       # To read the JSON from s3 
       DefinitionS3Location:
         Bucket: !Ref RawBucket
         Key: 'sf_scripts/nyc-taxi-sf.json'
-  
-  # ==== 6.1. SNS Topic for SF Failure ==== #
+
+  # ==== 6.1 EventBridge : Trigger SF on S3 Upload ==== #
+  S3ToStepFunctionRule:
+    Type: AWS::Events::Rule
+    Condition: CreateSF
+    Properties:
+      Description: "Trigger SF when file is uploaded to raw_bucket/landing_files/"
+      State: ENABLED
+      EventPattern:
+        source:
+          - aws.s3
+        detail-type:
+          - "Object Created"
+        detail:
+          bucket:
+            name:
+              - !Sub '${ProjectName}-${Env}-raw-${AWS::AccountId}'
+          object:
+            key:
+              - prefix: "landing_files/"  # Filter for file path
+      Targets:
+        - Arn: !Ref NycTaxiStateMachine
+          Id: "NycTaxiSfTarget"
+          RoleArn: !GetAtt EventBridgeStepFunctionRole.Arn
+
+  # ==== 6.2 EventBridge : SF Failure ==== #
+  StepFunctionFailureRule:
+    Type: AWS::Events::Rule
+    Condition: CreateSF
+    Properties:
+      Description: "Trigger SNS if NYC Taxi Step Function fails"
+      State: ENABLED
+      EventPattern:
+        source:
+          - "aws.states"
+        detail-type:
+          - "Step Functions Execution Status Change"
+        detail:
+          status:
+            - "FAILED"
+            - "TIMED_OUT"
+            - "ABORTED"
+          stateMachineArn:
+            - !Ref NycTaxiStateMachine
+      Targets:
+        - Arn: !Ref NycTaxiSfErrorTopic
+          Id: "SendToSNS"
+          
+
+  # ==== 7.1. SNS Topic for SF Failure ==== #
   NycTaxiSfErrorTopic:
     Type: AWS::SNS::Topic
     Condition: CreateSF
     Properties:
       TopicName: !Sub "${ProjectName}-error-notifications"
 
-  # ==== 6.2. SNS Email Subscription for SF Failure ==== #
+  # ==== 7.2. SNS Email Subscription for SF Failure ==== #
   NycTaxiEmailSubscription:
     Type: AWS::SNS::Subscription
     Condition: CreateSF
@@ -373,7 +463,7 @@ Resources:
       Protocol: email
       TopicArn: !Ref NycTaxiSfErrorTopic
 
-  # ==== 7.1. Cloudwatch Alarm : SF Failure ==== # 
+  # ==== 8.1. Cloudwatch Alarm : SF Failure ==== # 
   StepFunctionFailedAlarm:
     Type: AWS::CloudWatch::Alarm
     Condition: CreateSF
@@ -392,7 +482,7 @@ Resources:
       AlarmActions:
         - !Ref NycTaxiSfErrorTopic
 
-  # ==== 7.2. Cloudwatch Monitoring ==== #
+  # ==== 8.2. Cloudwatch Monitoring ==== #
   CloudwatchDashboard:
     Type: AWS::CloudWatch::Dashboard
     Condition: CreateSF
