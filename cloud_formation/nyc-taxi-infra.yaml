@@ -361,7 +361,7 @@ Resources:
   StewardReviewTopic:
     Type: AWS::SNS::Topic
     Properties:
-      TopicName: !Sub "${ProjectName}-${Env}-steward-review"
+      TopicName: !Sub "${ProjectName}-steward-review"
 
   # SNS Subscription for Steward Review
   StewardEmailSubscription:

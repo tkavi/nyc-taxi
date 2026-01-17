@@ -54,7 +54,7 @@ pickup_dropoff_df = processed_df \
                 f.col("locationid").alias("pulocation_id"), 
                 f.col("zone").alias("pickup_zone"), 
                 f.col("borough").alias("pickup_borough")),
-            processed_df.pulocationid == f.col("pulocation_id"),
+            f.col("pulocationid") == f.col("pulocation_id"),
             "left"
         ).join(zones_df.select(
                 f.col("locationid").alias("dolocation_id"), 
