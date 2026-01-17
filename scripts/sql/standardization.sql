@@ -3,11 +3,11 @@ SELECT
     VendorID,
     tpep_pickup_datetime,
     tpep_dropoff_datetime,
-    CAST(passenger_count AS INT) AS passenger_count,
-    trip_distance,
-    -- RatecodeID 99 to NULL as per dictionary 
+    CAST(COALESCE(passenger_count,0) AS INT) AS passenger_count,
+    COALESCE(trip_distance,0),
+    -- RatecodeID NULL to 99 as per dictionary 
     CASE 
-        WHEN RatecodeID = 99 THEN NULL 
+        WHEN RatecodeID IS NULL THEN 99 
         ELSE CAST(RatecodeID AS INT) 
     END AS RatecodeID,
     -- Other value to NULL 
@@ -19,16 +19,16 @@ SELECT
     PULocationID,
     DOLocationID,
     CAST(payment_type AS INT) AS payment_type,
-    fare_amount,
-    extra,
-    mta_tax,
-    tip_amount,
-    tolls_amount,
-    improvement_surcharge,
-    total_amount,
-    congestion_surcharge,
-    airport_fee,
-    cbd_congestion_fee
+    COALESCE(fare_amount,0)
+    COALESCE(extra,0),
+    COALESCE(mta_tax,0),
+    COALESCE(tip_amount,0),
+    COALESCE(tolls_amount,0),
+    COALESCE(improvement_surcharge,0),
+    COALESCE(total_amount,0),
+    COALESCE(congestion_surcharge,0),
+    COALESCE(airport_fee,0),
+    COALESCE(cbd_congestion_fee,0)
 FROM raw_nyc_taxi_data
 WHERE 
     -- Valid TPEP providers

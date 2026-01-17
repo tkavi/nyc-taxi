@@ -109,7 +109,7 @@ daily_metrics_df = trip_details_df.groupBy(
     "vendor_name"
 ).agg(
     f.count("*").alias("total_trips"),
-    f.round(f.sum("total_amount"), 2).alias("total_revenue"),
+    f.round(f.sum("total_amount")/1000000, 2).alias("total_revenue"),
     f.round(f.avg("tip_amount"), 2).alias("avg_tip"),
     f.round(f.avg(
         f.col("tip_amount") / f.when(f.col("total_amount") - f.col("tip_amount") <= 0, None)
@@ -120,10 +120,10 @@ daily_metrics_df = trip_details_df.groupBy(
     f.col("pickup_day.start").alias("trip_date"),
     "vendor_name",
     "total_trips",
-    f.col("total_revenue").alias("daily_revenue"),
+    f.col("total_revenue").alias("daily_revenue(in M)"),
     f.col("avg_tip").alias("avg_tip"),
     "avg_tip_percentage",
-    "longest_trip"
+    "longest_trip(in miles)"
 )
 
 daily_metrics_path = f"s3://{args['CURATED_BUCKET']}/daily_metrics/"
@@ -139,7 +139,7 @@ print("Calculating Location Performance...")
 location_perf_df = trip_details_df.groupBy("pickup_zone", "pickup_borough") \
     .agg(
         f.count("*").alias("pickup_count"),
-        f.avg("fare_amount").alias("avg_fare_by_zone")
+        f.round(f.avg("fare_amount"),2).alias("avg_fare_by_zone")
     ).orderBy(f.desc("pickup_count"))
 
 location_perf_path = f"s3://{args['CURATED_BUCKET']}/location_performance/"
@@ -149,10 +149,11 @@ location_perf_df.write.format("delta").mode("overwrite") \
         .option("overwriteSchema", "true") \
         .save(location_perf_path)
 
+
 # 4. Vendor Performance
 vendor_perf_df = trip_details_df.groupBy("vendor_name").agg(
     f.count("*").alias("total_trips"),
-    f.sum("total_amount").alias("revenue")
+    f.round(f.sum("total_amount")/1000000,2).alias("revenue(in M)")
 )
 
 vendor_perf_path = f"s3://{args['CURATED_BUCKET']}/vendor_performance/"

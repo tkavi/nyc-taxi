@@ -130,12 +130,6 @@ else:
     dq_df.filter(col("Outcome") == "Failed").select("Rule", "FailureReason").show(truncate=False)
 
     # Generating a timestamped path for the quarantine folder
-    # run_date = datetime.datetime.now().strftime("year=%Y/month=%m/day=%d/run=%H%M")
-    
-    # Extracting the Raw Bucket name from PROCESSED_PATH
-    # raw_bucket_base = args['PROCESSED_PATH'].replace("processed", "raw").split('/')[0:3]
-    # raw_bucket_url = "/".join(raw_bucket_base)
-            # .partitionBy("year","month","day","run") \
     run_id = datetime.datetime.now().strftime("%Y%m%d_%H%M")
     quarantine_path = f"s3://{args['RAW_BUCKET']}/quarantine/"
 
