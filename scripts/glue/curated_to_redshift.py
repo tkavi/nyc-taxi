@@ -6,35 +6,26 @@ from awsglue.utils import getResolvedOptions
 
 # Arguments from CloudFormation YAML
 args = getResolvedOptions(sys.argv, [
-    'SECRET_NAME'
+    'SECRET_NAME',
+    'RAW_BUCKET',
     'CURATED_BUCKET',
+    'DDL_PATH',
     'REDSHIFT_IAM_ROLE',
     'WORKGROUP_NAME' 
 ])
 
 secrets_manager = boto3.client('secretsmanager')
 redshift_data = boto3.client('redshift-data')
+s3_client = boto3.client('s3')
 
-# For S3 copy from curated to Redshift 
-def run_redshift_copy(creds, target_table, iam_role, workgroup_name): 
-    s3_path = f"s3://{args['CURATED_BUCKET']}/{target_table}"
-
-    copy_query = f"""
-        COPY {target_table}
-        FROM '{s3_path}'
-        IAM_ROLE '{iam_role}'
-        FORMAT AS PARQUET;
-    """
-    
-    print(f"Starting COPY to {target_table}...")
-    
-    response = redshift_data.execute_statement(
-        WorkgroupName=workgroup_name,
+# to run redshift queries
+def run_redshift_queries(creds, sql_test):    
+    redshift_data.execute_statement(
+        WorkgroupName=args['WORKGROUP_NAME'],
         Database=creds['dbName'],
-        DbUser=creds['username'],
-        Sql=copy_query
+        Sql=sql_test
     )
-    
+
     query_id = response['Id']
     
     # Wait for completion
@@ -50,24 +41,43 @@ def run_redshift_copy(creds, target_table, iam_role, workgroup_name):
             raise Exception(f"Redshift COPY failed with status {status}: {error}")
         
         print("Waiting for COPY to finish...")
-        time.sleep(10)
+        time.sleep(4)
 
-# List of tables to copy
-TARGET_TABLES = [
-    'trip_details', 
-    'daily_metrics',
-    'location_performance', 
-    'vendor_performance' 
-]
-
-# Getting Redshift credentials 
+# Getting Redshift credentials from secrets manager
 response = secrets_manager.get_secret_value(args['SECRET_NAME'])
 creds = json.loads(response['SecretString'])
 
-for table in TARGET_TABLES:
-    run_redshift_copy(
-        creds, 
-        table, 
-        args['REDSHIFT_IAM_ROLE'],
-        args['WORKGROUP_NAME']
-    )
+# list of required ddls
+sql_files = [
+    "dim_zones.sql",
+    "dim_vendors.sql",
+    "dim_ratecodes.sql",
+    "trip_details.sql",
+    "daily_metrics.sql",
+    "vendor_performance.sql",
+    "location_performance.sql"
+]
+
+for file_name in sql_files:
+    # Read SQL from S3
+    print(f"Reading {file_name} from S3...")
+    s3_key = f"{args['DDL_PATH']}/{file_name}"
+    obj = s3_client.get_object(Bucket=args['RAW_BUCKET'], Key=s3_key)
+    ddl_text = obj['Body'].read().decode('utf-8')
+    
+    print(f"Creating table using {file_name}...")
+    run_redshift_queries(creds, ddl_text)
+    
+    table_name = file_name.replace(".sql", "") 
+    data_path = f"s3://{args['CURATED_BUCKET']}/{table_name}/"
+
+    # Run COPY command
+    copy_query = f"""
+        COPY {table_name}
+        FROM '{data_path}'
+        IAM_ROLE '{args['REDSHIFT_IAM_ROLE']}'
+        FORMAT AS PARQUET;
+    """
+
+    run_redshift_queries(creds, copy_query)
+    print(f"Successfully copied {table_name}\n")

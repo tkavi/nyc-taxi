@@ -397,7 +397,9 @@ Resources:
         ScriptLocation: !Sub 's3://${ProjectName}-${Env}-raw-${AWS::AccountId}/scripts/glue/curated_to_redshift.py'
       DefaultArguments:
         "--SECRET_NAME": !Ref RedshiftSecret
+        "--RAW_BUCKET": !Ref RawBucket
         "--CURATED_BUCKET": !Ref CuratedBucket
+        "--DDL_PATH": !Sub 's3://${ProjectName}-${Env}-raw-${AWS::AccountId}/scripts/ddl'
         "--REDSHIFT_IAM_ROLE": !GetAtt RedshiftS3Role.Arn
         "--WORKGROUP_NAME": !Ref RedshiftWorkgroup
         "--additional-python-modules": "boto3"
@@ -569,12 +571,22 @@ Resources:
           Value: !Sub "${ProjectName}-vpc"
 
   # Redshift lives inside private subnet
-  PrivateSubnet:
+  PrivateSubnetA:
     Type: AWS::EC2::Subnet
     Properties:
       VpcId: !Ref VPC
       CidrBlock: 10.0.2.0/24
       AvailabilityZone: !Select [ 0, !GetAZs "" ]
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectName}-private-subnet"
+
+  PrivateSubnetB:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: 10.0.3.0/24
+      AvailabilityZone: !Select [ 1, !GetAZs "" ]
       Tags:
         - Key: Name
           Value: !Sub "${ProjectName}-private-subnet"
@@ -590,10 +602,16 @@ Resources:
           Value: !Sub "${ProjectName}-public-routetable"
 
   # Associate the Route Table with your Public Subnet
-  PrivateRouteTableAssociation:
+  PrivateRouteTableAssociationA:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
-      SubnetId: !Ref PrivateSubnet
+      SubnetId: !Ref PrivateSubnetA
+      RouteTableId: !Ref PrivateRouteTable
+
+  PrivateRouteTableAssociationB:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PrivateSubnetB
       RouteTableId: !Ref PrivateRouteTable
 
   # ==== 9.3 S3 Gateway Endpoint (Instead of Internet Gateway) ==== #
@@ -651,10 +669,11 @@ Resources:
     Properties:
       WorkgroupName: !Sub "${ProjectName}-workgroup"
       NamespaceName: !Ref RedshiftNamespace
-      BaseCapacity: 8
+      BaseCapacity: 4
       MaxCapacity: 8
       SubnetIds:
-        - !Ref PrivateSubnet
+        - !Ref PrivateSubnetA
+        - !Ref PrivateSubnetB
       SecurityGroupIds:
         - !Ref RedshiftSecurityGroup
       PubliclyAccessible: false
@@ -674,7 +693,7 @@ Resources:
           USERNAME: "admin"
           PASSWORD: !Sub "{{resolve:secretsmanager:${RedshiftSecret}:SecretString:password}}"
         PhysicalConnectionRequirements:
-          SubnetId: !Ref PrivateSubnet 
+          SubnetId: !Ref PrivateSubnetA
           SecurityGroupIdList: 
             - !Ref RedshiftSecurityGroup
 
