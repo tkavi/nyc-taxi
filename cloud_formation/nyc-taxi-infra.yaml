@@ -635,7 +635,8 @@ Resources:
         SecretStringTemplate: '{"username": "admin", "dbName": "dev"}'
         GenerateStringKey: "password"
         PasswordLength: 16
-        ExcludeCharacters: '"@/\'
+        RequireEachIncludedType: true
+        ExcludeCharacters: '"@/\ '
   
   # ==== 11.1 Redshift Security Group ==== #
   RedshiftSecurityGroup:
