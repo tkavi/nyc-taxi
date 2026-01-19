@@ -115,7 +115,7 @@ daily_metrics_df = trip_details_df.groupBy(
         f.col("tip_amount") / f.when(f.col("total_amount") - f.col("tip_amount") <= 0, None)
         .otherwise(f.col("total_amount") - f.col("tip_amount")) * 100
     ), 2).alias("avg_tip_percentage"),
-    f.max("trip_distance").alias("longest_trip")
+    f.max("trip_distance").alias("longest_trip(in miles)")
 ).select(
     f.col("pickup_day.start").alias("trip_date"),
     "vendor_name",

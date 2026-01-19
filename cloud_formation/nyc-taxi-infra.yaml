@@ -160,6 +160,20 @@ Resources:
                   - athena:GetQueryExecution
                   - athena:GetQueryResults
                 Resource: "*"
+              # Permissions to talk to Redshift
+              - Effect: Allow
+                Action:
+                  - 'redshift-data:ExecuteStatement'
+                  - 'redshift-data:DescribeStatement'
+                  - 'redshift-data:GetStatementResult'
+                  - 'redshift-data:ListStatements'
+                  - 'redshift-serverless:GetWorkgroup'
+                Resource: "*"           
+              # Permission to get the DB credentials from Secrets Manager
+              - Effect: Allow
+                Action:
+                  - 'secretsmanager:GetSecretValue'
+                Resource: !Ref RedshiftSecret 
 
   # ==== 3.2. IAM Role for Step Function ==== #
   StepFunctionExecutionRole:
@@ -249,6 +263,21 @@ Resources:
               Service: "events.amazonaws.com"
             Action: "sns:Publish"
             Resource: !Ref NycTaxiSfErrorTopic
+
+  # ==== 3.5 IAM Role for Redshift ==== #
+  RedshiftS3Role:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          # Permissions for Redshift to pull data from S3
+          - Effect: Allow
+            Principal:
+              Service: [redshift.amazonaws.com]
+            Action: ["sts:AssumeRole"]
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess
 
   # ==== 4. ETL Layer: AWS Glue Jobs ==== #
   RawToProcessedJob:
@@ -356,6 +385,23 @@ Resources:
         '--enable-observability-metrics': 'true'     
         '--job-bookmark-option': 'job-bookmark-enable'
         "--conf": "spark.sql.extensions=io.delta.sql.DeltaSparkSessionExtension --conf spark.sql.catalog.spark_catalog=org.apache.spark.sql.delta.catalog.DeltaCatalog"
+
+  CuratedToRedshiftJob:
+    Type: AWS::Glue::Job
+    Properties:
+      Name: !Sub '${ProjectName}-${Env}-curated-to-redshift-job'
+      Role: !GetAtt GlueServiceRoleNew.Arn
+      Command:
+        Name: pythonshell
+        PythonVersion: "3.9"
+        ScriptLocation: !Sub 's3://${ProjectName}-${Env}-raw-${AWS::AccountId}/scripts/glue/curated_to_redshift.py'
+      DefaultArguments:
+        "--SECRET_NAME": !Ref RedshiftSecret
+        "--CURATED_BUCKET": !Ref CuratedBucket
+        "--REDSHIFT_IAM_ROLE": !GetAtt RedshiftS3Role.Arn
+        "--WORKGROUP_NAME": !Ref RedshiftWorkgroup
+        "--additional-python-modules": "boto3"
+      MaxCapacity: 0.0625
 
   # SNS Topic for Steward Review
   StewardReviewTopic:
@@ -509,6 +555,128 @@ Resources:
             }
           ]
         }
+
+  # ==== 9.1 Networking Layer ==== #
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.0.0.0/16
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectName}-vpc"
+
+  # Redshift lives inside private subnet
+  PrivateSubnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: 10.0.2.0/24
+      AvailabilityZone: !Select [ 0, !GetAZs "" ]
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectName}-private-subnet"
+
+  # ==== 9.2 Routing & Connectivity ==== # 
+  # The main "hub" for routing
+  PrivateRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectName}-public-routetable"
+
+  # Associate the Route Table with your Public Subnet
+  PrivateRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PrivateSubnet
+      RouteTableId: !Ref PrivateRouteTable
+
+  # ==== 9.3 S3 Gateway Endpoint (Instead of Internet Gateway) ==== #
+  # Redshift to talk to S3 privately without hitting the internet
+  S3Endpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcId: !Ref VPC
+      ServiceName: !Sub "com.amazonaws.${AWS::Region}.s3"
+      VpcEndpointType: Gateway
+      RouteTableIds:
+        - !Ref PrivateRouteTable
+
+  # ==== 10. Secrets Manager ==== #
+  RedshiftSecret:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Name: !Sub "${ProjectName}-redshift-secrets"
+      Description: "Redshift admin credentials for NYC Taxi Project"
+      GenerateSecretString:
+        SecretStringTemplate: '{"username": "admin", "dbName": "dev"}'
+        GenerateStringKey: "password"
+        PasswordLength: 16
+        ExcludeCharacters: '"@/\'
+  
+  # ==== 11.1 Redshift Security Group ==== #
+  RedshiftSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: "Allow Glue access to Redshift"
+      VpcId: !Ref VPC
+  
+  # This separate resource breaks the circular reference loopfor Glue workers
+  RedshiftSGIngress:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !Ref RedshiftSecurityGroup
+      IpProtocol: -1
+      FromPort: 0
+      ToPort: 65535
+      SourceSecurityGroupId: !Ref RedshiftSecurityGroup
+  
+  # ==== 11.2 Redshift Serverless ==== #
+  RedshiftNamespace:
+    Type: AWS::RedshiftServerless::Namespace
+    Properties:
+      NamespaceName: !Sub "${ProjectName}-namespace"
+      AdminUsername: admin
+      AdminUserPassword: !Sub "{{resolve:secretsmanager:${RedshiftSecret}:SecretString:password}}"
+      IamRoles:
+        - !GetAtt RedshiftS3Role.Arn
+
+  RedshiftWorkgroup:
+    Type: AWS::RedshiftServerless::Workgroup
+    Properties:
+      WorkgroupName: !Sub "${ProjectName}-workgroup"
+      NamespaceName: !Ref RedshiftNamespace
+      BaseCapacity: 8
+      MaxCapacity: 8
+      SubnetIds:
+        - !Ref PrivateSubnet
+      SecurityGroupIds:
+        - !Ref RedshiftSecurityGroup
+      PubliclyAccessible: false
+
+  # ==== 11.3 Redshift Glue Connection ==== #
+  RedshiftGlueConnection:
+    Type: AWS::Glue::Connection
+    Properties:
+      CatalogId: !Ref 'AWS::AccountId'
+      ConnectionInput:
+        Name: !Sub "${ProjectName}-redshift-conn"
+        ConnectionType: JDBC
+        ConnectionProperties:
+          JDBC_CONNECTION_URL: !Sub 
+            - "jdbc:redshift://${WorkgroupName}.${AWS::AccountId}.${AWS::Region}.redshift-serverless.amazonaws.com:5439/dev"
+            - WorkgroupName: !Ref RedshiftWorkgroup
+          USERNAME: "admin"
+          PASSWORD: !Sub "{{resolve:secretsmanager:${RedshiftSecret}:SecretString:password}}"
+        PhysicalConnectionRequirements:
+          SubnetId: !Ref PrivateSubnet 
+          SecurityGroupIdList: 
+            - !Ref RedshiftSecurityGroup
+
   
 Outputs:
   RawBucketName:
