@@ -44,6 +44,13 @@
       "Type": "Task",
       "Resource": "arn:aws:states:::glue:startJobRun.sync",
       "Parameters": { "JobName": "${GlueJobName2}" },
+      "Next": "CuratedToRedshift"
+    },
+
+    "CuratedToRedshift": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::glue:startJobRun.sync",
+      "Parameters": { "JobName": "${GlueJobName3}" },
       "End": true
     }
   }

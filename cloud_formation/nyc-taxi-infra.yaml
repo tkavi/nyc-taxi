@@ -443,6 +443,7 @@ Resources:
         CrawlerName: !Ref RawDataCrawler
         GlueJobName1: !Ref RawToProcessedJob
         GlueJobName2: !Ref ProcessedToCuratedJob
+        GlueJobName3: !Ref CuratedToRedshiftJob
       # To read the JSON from s3 
       DefinitionS3Location:
         Bucket: !Ref RawBucket
