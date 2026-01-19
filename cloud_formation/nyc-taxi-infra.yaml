@@ -661,7 +661,7 @@ Resources:
     Properties:
       NamespaceName: !Sub "${ProjectName}-namespace"
       AdminUsername: admin
-      AdminUserPassword: !Sub "{{resolve:secretsmanager:${RedshiftSecret}:SecretString:password}}"
+      AdminUserPassword: !Sub "{{resolve:secretsmanager:${ProjectName}-redshift-secrets:SecretString:password}}"
       IamRoles:
         - !GetAtt RedshiftS3Role.Arn
 
@@ -690,9 +690,9 @@ Resources:
         ConnectionProperties:
           JDBC_CONNECTION_URL: !Sub 
             - "jdbc:redshift://${WorkgroupName}.${AWS::AccountId}.${AWS::Region}.redshift-serverless.amazonaws.com:5439/dev"
-            - WorkgroupName: !Ref RedshiftWorkgroup
+            - WorkgroupName: !Sub "${ProjectName}-workgroup"
           USERNAME: "admin"
-          PASSWORD: !Sub "{{resolve:secretsmanager:${RedshiftSecret}:SecretString:password}}"
+          PASSWORD: !Sub "{{resolve:secretsmanager:${ProjectName}-redshift-secrets:SecretString:password}}"
         PhysicalConnectionRequirements:
           SubnetId: !Ref PrivateSubnetA
           SecurityGroupIdList: 
