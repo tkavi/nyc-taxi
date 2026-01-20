@@ -247,7 +247,34 @@ Resources:
                 Action: states:StartExecution
                 Resource: !If [CreateSF, !Ref NycTaxiStateMachine, "arn:aws:states:*:*:stateMachine:*"]
 
-  # ==== 3.4 Resource Policy ==== #
+  # ==== 3.4 IAM Role for QuickSight ==== #
+  QuickSightVPCServiceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${ProjectName}-quicksight-vpc-role"
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: quicksight.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: QuickSightVPCManagement
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - "ec2:CreateNetworkInterface"
+                  - "ec2:ModifyNetworkInterfaceAttribute"
+                  - "ec2:DeleteNetworkInterface"
+                  - "ec2:DescribeNetworkInterfaces"
+                  - "ec2:DescribeSubnets"
+                  - "ec2:DescribeSecurityGroups"
+                Resource: "*"
+
+  # ==== 3.5 Resource Policy ==== #
   SnsTopicPolicy:
     Type: AWS::SNS::TopicPolicy
     Condition: CreateSF
@@ -660,7 +687,7 @@ Resources:
     Type: AWS::RedshiftServerless::Namespace
     DependsOn: RedshiftSecret
     Properties:
-      NamespaceName: !Sub "${ProjectName}-${Env}-namespace-v2"
+      NamespaceName: !Sub "${ProjectName}-namespace-v2"
       AdminUsername: admin
       AdminUserPassword: !Sub "{{resolve:secretsmanager:${RedshiftSecret}:SecretString:password::}}"
       IamRoles:
@@ -670,7 +697,7 @@ Resources:
     Type: AWS::RedshiftServerless::Workgroup
     DependsOn: RedshiftNamespaceV2
     Properties:
-      WorkgroupName: !Sub "${ProjectName}-${Env}-workgroup-v2"
+      WorkgroupName: !Sub "${ProjectName}-workgroup-v2"
       NamespaceName: !Ref RedshiftNamespaceV2
       BaseCapacity: 4
       MaxCapacity: 8
@@ -700,7 +727,42 @@ Resources:
           SecurityGroupIdList: 
             - !Ref RedshiftSecurityGroup
 
-  
+  # ==== 12.1 QuickSight - VPC Connection ==== #
+  QuickSightVPCConnection:
+    Type: AWS::QuickSight::VPCConnection
+    Properties:
+      AwsAccountId: !Ref "AWS::AccountId"
+      VPCConnectionId: !Sub "${ProjectName}-qs-vpc-conn"
+      Name: !Sub "${ProjectName}-vpc-connection"
+      SubnetIds:
+        - !Ref PrivateSubnetA
+        - !Ref PrivateSubnetB
+      SecurityGroupIds:
+        - !Ref RedshiftSecurityGroup
+      RoleArn: !GetAtt QuickSightVPCServiceRole.Arn
+
+  # ==== 12.1 QuickSight - Redshift Datasource ==== #
+  RedshiftDataSource:
+    Type: AWS::QuickSight::DataSource
+    Properties:
+      AwsAccountId: !Ref "AWS::AccountId"
+      DataSourceId: !Sub "${ProjectName}-redshift-source"
+      Name: "NYC Taxi Redshift Data"
+      Type: REDSHIFT
+      DataSourceParameters:
+        RedshiftParameters:
+          # This should match your Serverless Workgroup endpoint
+          Host: !GetAtt RedshiftWorkgroupV2.Workgroup.Endpoint.Address
+          Database: "dev"
+          Port: 5439
+      VpcConnectionProperties:
+        VpcConnectionArn: !GetAtt QuickSightVPCConnection.Arn
+      Credentials:
+        CredentialPair:
+          Username: "admin"
+          Password: !Sub "{{resolve:secretsmanager:${RedshiftSecret}:SecretString:password::}}"
+
+
 Outputs:
   RawBucketName:
     Value: !Ref RawBucket
