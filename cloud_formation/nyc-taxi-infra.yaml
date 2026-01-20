@@ -591,6 +591,16 @@ Resources:
         - Key: Name
           Value: !Sub "${ProjectName}-private-subnet"
 
+  PrivateSubnetC:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: 10.0.4.0/24
+      AvailabilityZone: !Select [ 2, !GetAZs "" ]
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectName}-private-subnet"
+
   # ==== 9.2 Routing & Connectivity ==== # 
   # The main "hub" for routing
   PrivateRouteTable:
@@ -599,9 +609,9 @@ Resources:
       VpcId: !Ref VPC
       Tags:
         - Key: Name
-          Value: !Sub "${ProjectName}-public-routetable"
+          Value: !Sub "${ProjectName}-private-routetable"
 
-  # Associate the Route Table with your Public Subnet
+  # Associate the Route Table with your Subnet
   PrivateRouteTableAssociationA:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
@@ -612,6 +622,12 @@ Resources:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
       SubnetId: !Ref PrivateSubnetB
+      RouteTableId: !Ref PrivateRouteTable
+
+  PrivateRouteTableAssociationC:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PrivateSubnetC
       RouteTableId: !Ref PrivateRouteTable
 
   # ==== 9.3 S3 Gateway Endpoint (Instead of Internet Gateway) ==== #
@@ -677,6 +693,7 @@ Resources:
       SubnetIds:
         - !Ref PrivateSubnetA
         - !Ref PrivateSubnetB
+        - !Ref PrivateSubnetC
       SecurityGroupIds:
         - !Ref RedshiftSecurityGroup
       PubliclyAccessible: false
