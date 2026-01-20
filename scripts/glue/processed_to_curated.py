@@ -153,7 +153,7 @@ location_perf_df.write.format("delta").mode("overwrite") \
 # 4. Vendor Performance
 vendor_perf_df = trip_details_df.groupBy("vendor_name").agg(
     f.count("*").alias("total_trips"),
-    f.round(f.sum("total_amount")/1000000,2).alias("revenue(in M)")
+    f.round(f.sum("total_amount")/1000000,2).alias("revenue_in_M")
 )
 
 vendor_perf_path = f"s3://{args['CURATED_BUCKET']}/vendor_performance/"
