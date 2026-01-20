@@ -417,8 +417,8 @@ Resources:
   CuratedToRedshiftJob:
     Type: AWS::Glue::Job
     DependsOn: 
-      - RedshiftNamespace
-      - RedshiftWorkgroup
+      - RedshiftNamespaceV2
+      - RedshiftWorkgroupV2
     Properties:
       Name: !Sub '${ProjectName}-${Env}-curated-to-redshift-job'
       Role: !GetAtt GlueServiceRoleNew.Arn
@@ -432,7 +432,7 @@ Resources:
         "--CURATED_BUCKET": !Ref CuratedBucket
         "--DDL_PATH": !Sub 's3://${ProjectName}-${Env}-raw-${AWS::AccountId}/scripts/ddl'
         "--REDSHIFT_IAM_ROLE": !GetAtt RedshiftS3Role.Arn
-        "--WORKGROUP_NAME": !Ref RedshiftWorkgroup
+        "--WORKGROUP_NAME": !Ref RedshiftWorkgroupV2
         "--additional-python-modules": "boto3"
       MaxCapacity: 0.0625
 
@@ -687,7 +687,7 @@ Resources:
       SourceSecurityGroupId: !Ref RedshiftSecurityGroup
   
   # ==== 11.2 Redshift Serverless ==== #
-  RedshiftNamespace:
+  RedshiftNamespaceV2:
     Type: AWS::RedshiftServerless::Namespace
     DependsOn: RedshiftSecret
     Properties:
@@ -697,12 +697,12 @@ Resources:
       IamRoles:
         - !GetAtt RedshiftS3Role.Arn
 
-  RedshiftWorkgroup:
+  RedshiftWorkgroupV2:
     Type: AWS::RedshiftServerless::Workgroup
-    DependsOn: RedshiftNamespace
+    DependsOn: RedshiftNamespaceV2
     Properties:
       WorkgroupName: !Sub "${ProjectName}-workgroup-v2"
-      NamespaceName: !Ref RedshiftNamespace
+      NamespaceName: !Ref RedshiftNamespaceV2
       BaseCapacity: 4
       MaxCapacity: 8
       SubnetIds:
@@ -723,7 +723,7 @@ Resources:
         ConnectionProperties:
           JDBC_CONNECTION_URL: !Sub 
             - "jdbc:redshift://${WorkgroupName}.${AWS::AccountId}.${AWS::Region}.redshift-serverless.amazonaws.com:5439/dev"
-            - WorkgroupName: !Ref RedshiftWorkgroup
+            - WorkgroupName: !Ref RedshiftWorkgroupV2
           USERNAME: "admin"
           PASSWORD: !Sub "{{resolve:secretsmanager:${RedshiftSecret}:SecretString:password::}}"
         PhysicalConnectionRequirements:
@@ -753,4 +753,4 @@ Outputs:
     Value: !Ref NycTaxiStateMachine
     Condition: CreateSF
   RedshiftWorkgroupName:
-    Value: !Ref RedshiftWorkgroup
+    Value: !Ref RedshiftWorkgroupV2
