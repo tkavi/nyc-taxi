@@ -401,7 +401,7 @@ Resources:
         "--CURATED_BUCKET": !Ref CuratedBucket
         "--DDL_PATH": !Sub 's3://${ProjectName}-${Env}-raw-${AWS::AccountId}/scripts/ddl'
         "--REDSHIFT_IAM_ROLE": !GetAtt RedshiftS3Role.Arn
-        "--WORKGROUP_NAME": !Ref RedshiftWorkgroup
+        "--WORKGROUP_NAME": !Ref RedshiftWorkgroupNew
         "--additional-python-modules": "boto3"
       MaxCapacity: 0.0625
 
@@ -656,21 +656,23 @@ Resources:
       SourceSecurityGroupId: !Ref RedshiftSecurityGroup
   
   # ==== 11.2 Redshift Serverless ==== #
-  RedshiftNamespace:
+  RedshiftNamespaceNew:
     Type: AWS::RedshiftServerless::Namespace
+    DependsOn: RedshiftSecret
     Properties:
-      NamespaceName: !Sub "${ProjectName}-namespace"
+      NamespaceName: !Sub "${ProjectName}-${Env}-namespace"
       AdminUsername: admin
       AdminUserPassword: !Sub "{{resolve:secretsmanager:${ProjectName}-redshift-secrets:SecretString:password}}"
       IamRoles:
         - !GetAtt RedshiftS3Role.Arn
 
-  RedshiftWorkgroup:
+  RedshiftWorkgroupNew:
     Type: AWS::RedshiftServerless::Workgroup
+    DependsOn: RedshiftNamespaceNew
     Properties:
-      WorkgroupName: !Sub "${ProjectName}-workgroup"
-      NamespaceName: !Ref RedshiftNamespace
-      BaseCapacity: 4
+      WorkgroupName: !Sub "${ProjectName}-${Env}-workgroup"
+      NamespaceName: !Ref RedshiftNamespaceNew
+      BaseCapacity: 8
       MaxCapacity: 8
       SubnetIds:
         - !Ref PrivateSubnetA
@@ -719,4 +721,6 @@ Outputs:
   StateMachineArn:
     Value: !Ref NycTaxiStateMachine
     Condition: CreateSF
-
+  RedshiftWorkgroupName:
+    Description: "The name of the Redshift Serverless Workgroup"
+    Value: !Ref RedshiftWorkgroupNew
