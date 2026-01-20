@@ -401,7 +401,7 @@ Resources:
         "--CURATED_BUCKET": !Ref CuratedBucket
         "--DDL_PATH": !Sub 's3://${ProjectName}-${Env}-raw-${AWS::AccountId}/scripts/ddl'
         "--REDSHIFT_IAM_ROLE": !GetAtt RedshiftS3Role.Arn
-        "--WORKGROUP_NAME": !Ref RedshiftWorkgroupNew
+        "--WORKGROUP_NAME": !Ref RedshiftWorkgroup
         "--additional-python-modules": "boto3"
       MaxCapacity: 0.0625
 
@@ -672,7 +672,7 @@ Resources:
       SourceSecurityGroupId: !Ref RedshiftSecurityGroup
   
   # ==== 11.2 Redshift Serverless ==== #
-  RedshiftNamespaceNew:
+  RedshiftNamespace:
     Type: AWS::RedshiftServerless::Namespace
     DependsOn: RedshiftSecret
     Properties:
@@ -682,12 +682,12 @@ Resources:
       IamRoles:
         - !GetAtt RedshiftS3Role.Arn
 
-  RedshiftWorkgroupNew:
+  RedshiftWorkgroup:
     Type: AWS::RedshiftServerless::Workgroup
-    DependsOn: RedshiftNamespaceNew
+    DependsOn: RedshiftNamespace
     Properties:
       WorkgroupName: !Sub "${ProjectName}-${Env}-workgroup"
-      NamespaceName: !Ref RedshiftNamespaceNew
+      NamespaceName: !Ref RedshiftNamespace
       BaseCapacity: 8
       MaxCapacity: 8
       SubnetIds:
@@ -709,7 +709,7 @@ Resources:
         ConnectionProperties:
           JDBC_CONNECTION_URL: !Sub 
             - "jdbc:redshift://${WorkgroupName}.${AWS::AccountId}.${AWS::Region}.redshift-serverless.amazonaws.com:5439/dev"
-            - WorkgroupName: !Sub "${ProjectName}-workgroup"
+            - WorkgroupName: !Ref RedshiftWorkgroup
           USERNAME: "admin"
           PASSWORD: !Sub "{{resolve:secretsmanager:${ProjectName}-redshift-secrets:SecretString:password}}"
         PhysicalConnectionRequirements:
@@ -740,4 +740,4 @@ Outputs:
     Condition: CreateSF
   RedshiftWorkgroupName:
     Description: "The name of the Redshift Serverless Workgroup"
-    Value: !Ref RedshiftWorkgroupNew
+    Value: !Ref RedshiftWorkgroup
