@@ -115,15 +115,15 @@ daily_metrics_df = trip_details_df.groupBy(
         f.col("tip_amount") / f.when(f.col("total_amount") - f.col("tip_amount") <= 0, None)
         .otherwise(f.col("total_amount") - f.col("tip_amount")) * 100
     ), 2).alias("avg_tip_percentage"),
-    f.max("trip_distance").alias("longest_trip(in miles)")
+    f.max("trip_distance").alias("longest_trip_in_miles")
 ).select(
     f.col("pickup_day.start").alias("trip_date"),
     "vendor_name",
     "total_trips",
-    f.col("total_revenue").alias("daily_revenue(in M)"),
+    f.col("total_revenue").alias("daily_revenue_in_M)"),
     f.col("avg_tip").alias("avg_tip"),
     "avg_tip_percentage",
-    "longest_trip(in miles)"
+    "longest_trip_in_miles"
 )
 
 daily_metrics_path = f"s3://{args['CURATED_BUCKET']}/daily_metrics/"
