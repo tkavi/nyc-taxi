@@ -18,6 +18,7 @@ Parameters:
     Default: 'false'
     AllowedValues: ['true', 'false']
 
+
 Conditions:
   CreateSF: !Equals [!Ref DeployStepFunction, 'true' ]  
 
@@ -428,7 +429,7 @@ Resources:
         "--CURATED_BUCKET": !Ref CuratedBucket
         "--DDL_PATH": !Sub 's3://${ProjectName}-${Env}-raw-${AWS::AccountId}/scripts/ddl'
         "--REDSHIFT_IAM_ROLE": !GetAtt RedshiftS3Role.Arn
-        "--WORKGROUP_NAME": !Ref RedshiftWorkgroupV2
+        "--WORKGROUP_NAME": !Ref RedshiftWorkgroup
         "--additional-python-modules": "boto3"
       MaxCapacity: 0.0625
 
@@ -683,7 +684,7 @@ Resources:
       SourceSecurityGroupId: !Ref RedshiftSecurityGroup
   
   # ==== 11.2 Redshift Serverless ==== #
-  RedshiftNamespaceV2:
+  RedshiftNamespace:
     Type: AWS::RedshiftServerless::Namespace
     DependsOn: RedshiftSecret
     Properties:
@@ -693,12 +694,12 @@ Resources:
       IamRoles:
         - !GetAtt RedshiftS3Role.Arn
 
-  RedshiftWorkgroupV2:
+  RedshiftWorkgroup:
     Type: AWS::RedshiftServerless::Workgroup
-    DependsOn: RedshiftNamespaceV2
+    DependsOn: RedshiftNamespace
     Properties:
       WorkgroupName: !Sub "${ProjectName}-workgroup-v2"
-      NamespaceName: !Ref RedshiftNamespaceV2
+      NamespaceName: !Ref RedshiftNamespace
       BaseCapacity: 4
       MaxCapacity: 8
       SubnetIds:
@@ -719,48 +720,13 @@ Resources:
         ConnectionProperties:
           JDBC_CONNECTION_URL: !Sub 
             - "jdbc:redshift://${WorkgroupName}.${AWS::AccountId}.${AWS::Region}.redshift-serverless.amazonaws.com:5439/dev"
-            - WorkgroupName: !Ref RedshiftWorkgroupV2
+            - WorkgroupName: !Ref RedshiftWorkgroup
           USERNAME: "admin"
           PASSWORD: !Sub "{{resolve:secretsmanager:${RedshiftSecret}:SecretString:password::}}"
         PhysicalConnectionRequirements:
           SubnetId: !Ref PrivateSubnetA
           SecurityGroupIdList: 
             - !Ref RedshiftSecurityGroup
-
-  # ==== 12.1 QuickSight - VPC Connection ==== #
-  QuickSightVPCConnection:
-    Type: AWS::QuickSight::VPCConnection
-    Properties:
-      AwsAccountId: !Ref "AWS::AccountId"
-      VPCConnectionId: !Sub "${ProjectName}-qs-vpc-conn"
-      Name: !Sub "${ProjectName}-vpc-connection"
-      SubnetIds:
-        - !Ref PrivateSubnetA
-        - !Ref PrivateSubnetB
-      SecurityGroupIds:
-        - !Ref RedshiftSecurityGroup
-      RoleArn: !GetAtt QuickSightVPCServiceRole.Arn
-
-  # ==== 12.1 QuickSight - Redshift Datasource ==== #
-  RedshiftDataSource:
-    Type: AWS::QuickSight::DataSource
-    Properties:
-      AwsAccountId: !Ref "AWS::AccountId"
-      DataSourceId: !Sub "${ProjectName}-redshift-source"
-      Name: "NYC Taxi Redshift Data"
-      Type: REDSHIFT
-      DataSourceParameters:
-        RedshiftParameters:
-          # This should match your Serverless Workgroup endpoint
-          Host: !GetAtt RedshiftWorkgroupV2.Workgroup.Endpoint.Address
-          Database: "dev"
-          Port: 5439
-      VpcConnectionProperties:
-        VpcConnectionArn: !GetAtt QuickSightVPCConnection.Arn
-      Credentials:
-        CredentialPair:
-          Username: "admin"
-          Password: !Sub "{{resolve:secretsmanager:${RedshiftSecret}:SecretString:password::}}"
 
 
 Outputs:
@@ -784,4 +750,4 @@ Outputs:
     Value: !Ref NycTaxiStateMachine
     Condition: CreateSF
   RedshiftWorkgroupName:
-    Value: !Ref RedshiftWorkgroupV2
+    Value: !Ref RedshiftWorkgroup
