@@ -416,6 +416,9 @@ Resources:
 
   CuratedToRedshiftJob:
     Type: AWS::Glue::Job
+    DependsOn: 
+      - RedshiftNamespace
+      - RedshiftWorkgroup
     Properties:
       Name: !Sub '${ProjectName}-${Env}-curated-to-redshift-job'
       Role: !GetAtt GlueServiceRoleNew.Arn
