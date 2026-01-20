@@ -676,9 +676,9 @@ Resources:
     Type: AWS::RedshiftServerless::Namespace
     DependsOn: RedshiftSecret
     Properties:
-      NamespaceName: !Sub "${ProjectName}-${Env}-namespace-V2"
+      NamespaceName: !Sub "${ProjectName}-${Env}-namespace-v2"
       AdminUsername: admin
-      AdminUserPassword: !Sub "{{resolve:secretsmanager:${ProjectName}-redshift-secrets:SecretString:password}}"
+      AdminUserPassword: !Sub "{{resolve:secretsmanager:${RedshiftSecret}::SecretString:password}}"
       IamRoles:
         - !GetAtt RedshiftS3Role.Arn
 
@@ -686,7 +686,7 @@ Resources:
     Type: AWS::RedshiftServerless::Workgroup
     DependsOn: RedshiftNamespaceV2
     Properties:
-      WorkgroupName: !Sub "${ProjectName}-${Env}-workgroup-V2"
+      WorkgroupName: !Sub "${ProjectName}-${Env}-workgroup-v2"
       NamespaceName: !Ref RedshiftNamespaceV2
       BaseCapacity: 8
       MaxCapacity: 8
@@ -711,7 +711,7 @@ Resources:
             - "jdbc:redshift://${WorkgroupName}.${AWS::AccountId}.${AWS::Region}.redshift-serverless.amazonaws.com:5439/dev"
             - WorkgroupName: !Ref RedshiftWorkgroupV2
           USERNAME: "admin"
-          PASSWORD: !Sub "{{resolve:secretsmanager:${ProjectName}-redshift-secrets:SecretString:password}}"
+          PASSWORD: !Sub "{{resolve:secretsmanager:${RedshiftSecret}::SecretString:password}}"
         PhysicalConnectionRequirements:
           SubnetId: !Ref PrivateSubnetA
           SecurityGroupIdList: 
