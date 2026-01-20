@@ -401,7 +401,7 @@ Resources:
         "--CURATED_BUCKET": !Ref CuratedBucket
         "--DDL_PATH": !Sub 's3://${ProjectName}-${Env}-raw-${AWS::AccountId}/scripts/ddl'
         "--REDSHIFT_IAM_ROLE": !GetAtt RedshiftS3Role.Arn
-        "--WORKGROUP_NAME": !Ref RedshiftWorkgroup
+        "--WORKGROUP_NAME": !Ref RedshiftWorkgroupV2
         "--additional-python-modules": "boto3"
       MaxCapacity: 0.0625
 
@@ -672,22 +672,22 @@ Resources:
       SourceSecurityGroupId: !Ref RedshiftSecurityGroup
   
   # ==== 11.2 Redshift Serverless ==== #
-  RedshiftNamespace:
+  RedshiftNamespaceV2:
     Type: AWS::RedshiftServerless::Namespace
     DependsOn: RedshiftSecret
     Properties:
-      NamespaceName: !Sub "${ProjectName}-${Env}-namespace"
+      NamespaceName: !Sub "${ProjectName}-${Env}-namespace-V2"
       AdminUsername: admin
       AdminUserPassword: !Sub "{{resolve:secretsmanager:${ProjectName}-redshift-secrets:SecretString:password}}"
       IamRoles:
         - !GetAtt RedshiftS3Role.Arn
 
-  RedshiftWorkgroup:
+  RedshiftWorkgroupV2:
     Type: AWS::RedshiftServerless::Workgroup
-    DependsOn: RedshiftNamespace
+    DependsOn: RedshiftNamespaceV2
     Properties:
-      WorkgroupName: !Sub "${ProjectName}-${Env}-workgroup"
-      NamespaceName: !Ref RedshiftNamespace
+      WorkgroupName: !Sub "${ProjectName}-${Env}-workgroup-V2"
+      NamespaceName: !Ref RedshiftNamespaceV2
       BaseCapacity: 8
       MaxCapacity: 8
       SubnetIds:
@@ -709,7 +709,7 @@ Resources:
         ConnectionProperties:
           JDBC_CONNECTION_URL: !Sub 
             - "jdbc:redshift://${WorkgroupName}.${AWS::AccountId}.${AWS::Region}.redshift-serverless.amazonaws.com:5439/dev"
-            - WorkgroupName: !Ref RedshiftWorkgroup
+            - WorkgroupName: !Ref RedshiftWorkgroupV2
           USERNAME: "admin"
           PASSWORD: !Sub "{{resolve:secretsmanager:${ProjectName}-redshift-secrets:SecretString:password}}"
         PhysicalConnectionRequirements:
@@ -739,5 +739,4 @@ Outputs:
     Value: !Ref NycTaxiStateMachine
     Condition: CreateSF
   RedshiftWorkgroupName:
-    Description: "The name of the Redshift Serverless Workgroup"
-    Value: !Ref RedshiftWorkgroup
+    Value: !Ref RedshiftWorkgroupV2
