@@ -1,5 +1,5 @@
 CREATE TABLE IF NOT EXISTS dim_ratecodes (
-    ratecodeid INT ENCODE AZ64,
+    ratecodeid BIGINT ENCODE AZ64,
     ratecode_desc VARCHAR(50) ENCODE ZSTD,
     updated_by VARCHAR(50) ENCODE ZSTD,
     approved_by VARCHAR(50) ENCODE ZSTD, 

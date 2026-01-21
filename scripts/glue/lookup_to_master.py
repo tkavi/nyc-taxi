@@ -153,7 +153,7 @@ steward_review_df.write.format("delta").mode("append").save(steward_path)
 # Golden Records for Vendors
 master_vendors = spark.createDataFrame(vendors_data, ["vendorid", "vendor_name"]) \
     .select(
-        f.col("vendorid").cast("int"),
+        f.col("vendorid"),
         f.col("vendor_name"),
         f.lit(args['JOB_NAME']).alias("updated_by"),
         f.lit("SYSTEM_AUTO_APPROVED").alias("approved_by"),
@@ -179,7 +179,7 @@ ratecodes_data = [
 # Golden Records for Ratecodes
 master_ratecodes = spark.createDataFrame(ratecodes_data, ["ratecodeid", "ratecode_desc"]) \
     .select(
-        f.col("ratecodeid").cast("int"),
+        f.col("ratecodeid"),
         f.col("ratecode_desc").alias("Ratecode_desc"),
         f.lit(args['JOB_NAME']).alias("updated_by"),
         f.lit("SYSTEM_AUTO_APPROVED").alias("approved_by"),
