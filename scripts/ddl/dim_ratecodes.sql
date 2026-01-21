@@ -1,3 +1,5 @@
+DROP TABLE IF EXISTS dim_ratecodes;
+
 CREATE TABLE IF NOT EXISTS dim_ratecodes (
     ratecodeid BIGINT ENCODE AZ64,
     ratecode_desc VARCHAR(50) ENCODE ZSTD,

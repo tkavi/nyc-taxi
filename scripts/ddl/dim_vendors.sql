@@ -1,3 +1,5 @@
+DROP TABLE IF EXISTS dim_vendors;
+
 CREATE TABLE IF NOT EXISTS dim_vendors (
     vendorid BIGINT ENCODE AZ64,
     vendor_name VARCHAR(100) ENCODE ZSTD,
