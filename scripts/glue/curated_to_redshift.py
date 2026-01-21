@@ -44,7 +44,7 @@ def run_redshift_queries(creds, sql_test):
         time.sleep(4)
 
 # Getting Redshift credentials from secrets manager
-response = secrets_manager.get_secret_value(args['SECRET_NAME'])
+response = secrets_manager.get_secret_value(SecretId=args['SECRET_NAME'])
 creds = json.loads(response['SecretString'])
 
 # list of required ddls
