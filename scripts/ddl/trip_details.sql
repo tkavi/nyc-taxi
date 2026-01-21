@@ -26,5 +26,5 @@ CREATE TABLE IF NOT EXISTS trip_details (
     airport_fee DOUBLE PRECISION ENCODE RAW,
     cbd_congestion_fee DOUBLE PRECISION ENCODE RAW
 ) 
-DISTSTYLE ALL
+DISTSTYLE EVEN
 SORTKEY (pulocationid, tpep_pickup_datetime);
