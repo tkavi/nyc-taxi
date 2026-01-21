@@ -437,6 +437,7 @@ Resources:
         '--JOB_NAME': 'curated-to-redshift'
         "--SECRET_NAME": !Ref RedshiftSecret
         "--RAW_BUCKET": !Ref RawBucket
+        "--MASTER_BUCKET": !Ref MasterBucket
         "--CURATED_BUCKET": !Ref CuratedBucket
         "--DDL_PATH": !Sub 'scripts/ddl'
         "--REDSHIFT_IAM_ROLE": !GetAtt RedshiftS3Role.Arn

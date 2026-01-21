@@ -12,6 +12,7 @@ args = getResolvedOptions(sys.argv, [
     'JOB_NAME',
     'SECRET_NAME',
     'RAW_BUCKET',
+    'MASTER_BUCKET',
     'CURATED_BUCKET',
     'DDL_PATH',
     'REDSHIFT_IAM_ROLE',
@@ -70,39 +71,44 @@ sql_files = [
     "location_performance.sql"
 ]
 
-for file_name in sql_files:
-   
+for file_name in sql_files:  
     # Read SQL from S3
-    print(f"Reading {file_name} from S3...")
     s3_key = f"{args['DDL_PATH']}/{file_name}"
     obj = s3_client.get_object(Bucket=args['RAW_BUCKET'], Key=s3_key)
     ddl_text = obj['Body'].read().decode('utf-8')
     
-    print(f"Creating table using {file_name}...")
+    # To create redshift tables
     run_redshift_queries(creds, ddl_text)
     
+    # to identify correct bucket
+    if table_name.startswith("dim_"):
+        source_bucket = args['MASTER_BUCKET']
+        print(f"Table {table_name} identified as a Dimension. Using MASTER bucket.")
+    else:
+        source_bucket = args['CURATED_BUCKET']
+        print(f"Table {table_name} identified as a Fact/Metric. Using CURATED bucket.")
+    
     table_name = file_name.replace(".sql", "") 
-    data_path = f"s3://{args['CURATED_BUCKET']}/{table_name}/"
+    data_path = f"s3://{source_bucket}/{table_name}/"
     parquet_path = f"s3://{args['CURATED_BUCKET']}/staging_parquet/{table_name}/"
 
-    # --- NEW: DELTA TO PARQUET CONVERSION ---
+    # Delta to Parquet Conversion
     print(f"Converting {table_name} from Delta to Parquet...")
     try:
-        # Read the Delta table and write to a clean Parquet folder
         df = spark.read.format("delta").load(data_path)
         df.write.mode("overwrite").parquet(parquet_path)
     except Exception as e:
         print(f"Skipping conversion for {table_name} (might not be delta or empty): {e}")
-        # If it's already parquet, we point to the original path
         continue
 
-    # Run COPY command
     copy_query = f"""
         COPY {table_name}
         FROM '{parquet_path}'
         IAM_ROLE '{args['REDSHIFT_IAM_ROLE']}'
         FORMAT AS PARQUET;
     """
-
+    
+    # To run copy command
     run_redshift_queries(creds, copy_query)
+
     print(f"Successfully copied {table_name}\n")
