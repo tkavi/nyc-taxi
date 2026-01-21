@@ -54,7 +54,7 @@ def run_redshift_queries(creds, sql_test):
             raise Exception(f"Redshift COPY failed with status {status}: {error}")
         
         print("Waiting for COPY to finish...")
-        time.sleep(4)
+        time.sleep(10)
 
 # Getting Redshift credentials from secrets manager
 response = secrets_manager.get_secret_value(SecretId=args['SECRET_NAME'])

@@ -432,7 +432,7 @@ Resources:
       ExecutionProperty:
         MaxConcurrentRuns: 1
       MaxRetries: 0
-      Timeout: 5
+      Timeout: 10
       DefaultArguments:
         '--JOB_NAME': 'curated-to-redshift'
         "--SECRET_NAME": !Ref RedshiftSecret
