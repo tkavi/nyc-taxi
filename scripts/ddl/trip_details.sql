@@ -13,16 +13,16 @@ CREATE TABLE IF NOT EXISTS trip_details (
     trip_distance DOUBLE PRECISION ENCODE RAW,
     ratecodeid INT ENCODE AZ64,
     ratecode_desc VARCHAR(50) ENCODE ZSTD,
-    fare_amount DECIMAL(10,2) ENCODE AZ64,
-    extra DECIMAL(10,2) ENCODE AZ64,
-    mta_tax DECIMAL(10,2) ENCODE AZ64,
-    tip_amount DECIMAL(10,2) ENCODE AZ64,
-    tolls_amount DECIMAL(10,2) ENCODE AZ64,
-    improvement_surcharge DECIMAL(10,2) ENCODE AZ64,
-    total_amount DECIMAL(10,2) ENCODE AZ64,
-    congestion_surcharge DECIMAL(10,2) ENCODE AZ64,
-    airport_fee DECIMAL(10,2) ENCODE AZ64,
-    cbd_congestion_fee DECIMAL(10,2) ENCODE AZ64
+    fare_amount DOUBLE PRECISION ENCODE RAW,
+    extra DOUBLE PRECISION ENCODE RAW,
+    mta_tax DOUBLE PRECISION ENCODE RAW,
+    tip_amount DOUBLE PRECISION ENCODE RAW,
+    tolls_amount DOUBLE PRECISION ENCODE RAW,
+    improvement_surcharge DOUBLE PRECISION ENCODE RAW,
+    total_amount DOUBLE PRECISION ENCODE RAW,
+    congestion_surcharge DOUBLE PRECISION ENCODE RAW,
+    airport_fee DOUBLE PRECISION ENCODE RAW,
+    cbd_congestion_fee DOUBLE PRECISION ENCODE RAW
 ) 
 DISTSTYLE KEY DISTKEY (pulocationid) 
 SORTKEY (tpep_pickup_datetime);
