@@ -433,6 +433,9 @@ Resources:
         "--DDL_PATH": !Sub 's3://${ProjectName}-${Env}-raw-${AWS::AccountId}/scripts/ddl'
         "--REDSHIFT_IAM_ROLE": !GetAtt RedshiftS3Role.Arn
         "--WORKGROUP_NAME": !Ref RedshiftWorkgroupV2
+        '--enable-continuous-cloudwatch-log': 'true'
+        '--enable-metrics': 'true'                   
+        '--enable-observability-metrics': 'true'  
         "--additional-python-modules": "boto3"
       MaxCapacity: 0.0625
 
