@@ -94,7 +94,7 @@ for file_name in sql_files:
     except Exception as e:
         print(f"Skipping conversion for {table_name} (might not be delta or empty): {e}")
         # If it's already parquet, we point to the original path
-        parquet_path = data_path
+        continue
 
     # Run COPY command
     copy_query = f"""
