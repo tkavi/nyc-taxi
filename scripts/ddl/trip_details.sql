@@ -1,3 +1,5 @@
+DROP TABLE IF EXISTS trip_details;
+
 CREATE TABLE IF NOT EXISTS trip_details (
     vendorid INT ENCODE AZ64,
     vendor_name VARCHAR(50) ENCODE ZSTD,
@@ -24,5 +26,5 @@ CREATE TABLE IF NOT EXISTS trip_details (
     airport_fee DOUBLE PRECISION ENCODE RAW,
     cbd_congestion_fee DOUBLE PRECISION ENCODE RAW
 ) 
-DISTSTYLE KEY DISTKEY (pulocationid) 
-SORTKEY (tpep_pickup_datetime);
+DISTSTYLE ALL
+SORTKEY (pulocationid, tpep_pickup_datetime);
