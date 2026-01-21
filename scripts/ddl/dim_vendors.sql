@@ -1,4 +1,4 @@
-CREATE TABLE dim_vendors (
+CREATE TABLE IF NOT EXISTS dim_vendors (
     vendorid INT ENCODE AZ64,
     vendor_name VARCHAR(100) ENCODE ZSTD,
     updated_by VARCHAR(50) ENCODE ZSTD,

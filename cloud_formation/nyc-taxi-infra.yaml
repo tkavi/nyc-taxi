@@ -249,34 +249,7 @@ Resources:
                 Action: states:StartExecution
                 Resource: !If [CreateSF, !Ref NycTaxiStateMachine, "arn:aws:states:*:*:stateMachine:*"]
 
-  # ==== 3.4 IAM Role for QuickSight ==== #
-  QuickSightVPCServiceRole:
-    Type: AWS::IAM::Role
-    Properties:
-      RoleName: !Sub "${ProjectName}-quicksight-vpc-role"
-      AssumeRolePolicyDocument:
-        Version: '2012-10-17'
-        Statement:
-          - Effect: Allow
-            Principal:
-              Service: quicksight.amazonaws.com
-            Action: sts:AssumeRole
-      Policies:
-        - PolicyName: QuickSightVPCManagement
-          PolicyDocument:
-            Version: '2012-10-17'
-            Statement:
-              - Effect: Allow
-                Action:
-                  - "ec2:CreateNetworkInterface"
-                  - "ec2:ModifyNetworkInterfaceAttribute"
-                  - "ec2:DeleteNetworkInterface"
-                  - "ec2:DescribeNetworkInterfaces"
-                  - "ec2:DescribeSubnets"
-                  - "ec2:DescribeSecurityGroups"
-                Resource: "*"
-
-  # ==== 3.5 Resource Policy ==== #
+  # ==== 3.4 Resource Policy ==== #
   SnsTopicPolicy:
     Type: AWS::SNS::TopicPolicy
     Condition: CreateSF
@@ -307,6 +280,34 @@ Resources:
             Action: ["sts:AssumeRole"]
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess
+        - arn:aws:iam::aws:policy/AWSGlueConsoleReadOnlyAccess
+
+  # ==== 3.6 IAM Role for QuickSight ==== #
+  QuickSightVPCServiceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${ProjectName}-quicksight-vpc-role"
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: quicksight.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: QuickSightVPCManagement
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - "ec2:CreateNetworkInterface"
+                  - "ec2:ModifyNetworkInterfaceAttribute"
+                  - "ec2:DeleteNetworkInterface"
+                  - "ec2:DescribeNetworkInterfaces"
+                  - "ec2:DescribeSubnets"
+                  - "ec2:DescribeSecurityGroups"
+                Resource: "*"
 
   # ==== 4. ETL Layer: AWS Glue Jobs ==== #
   RawToProcessedJob:
@@ -672,6 +673,9 @@ Resources:
         PasswordLength: 16
         RequireEachIncludedType: true
         ExcludeCharacters: '"@/\ '
+      Tags:
+        - Key: Redshift
+          Value: !Sub "${ProjectName}-redshift-secret"
   
   # ==== 11.1 Redshift Security Group ==== #
   RedshiftSecurityGroup:
