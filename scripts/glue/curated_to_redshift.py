@@ -20,11 +20,12 @@ s3_client = boto3.client('s3')
 
 # to run redshift queries
 def run_redshift_queries(creds, sql_test):    
-    redshift_data.execute_statement(
-        WorkgroupName=args['WORKGROUP_NAME'],
-        Database=creds['dbName'],
-        Sql=sql_test
-    )
+    response = redshift_data.execute_statement(
+                WorkgroupName=args['WORKGROUP_NAME'],
+                Database=creds['dbName'],
+                SecretArn=args['SECRET_NAME'],
+                Sql=sql_test
+                )
 
     query_id = response['Id']
     
