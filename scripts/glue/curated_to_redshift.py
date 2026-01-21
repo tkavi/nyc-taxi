@@ -81,6 +81,8 @@ for file_name in sql_files:
     run_redshift_queries(creds, ddl_text)
     
     # to identify correct bucket
+    table_name = file_name.replace(".sql", "") 
+    
     if table_name.startswith("dim_"):
         source_bucket = args['MASTER_BUCKET']
         print(f"Table {table_name} identified as a Dimension. Using MASTER bucket.")
@@ -88,7 +90,6 @@ for file_name in sql_files:
         source_bucket = args['CURATED_BUCKET']
         print(f"Table {table_name} identified as a Fact/Metric. Using CURATED bucket.")
     
-    table_name = file_name.replace(".sql", "") 
     data_path = f"s3://{source_bucket}/{table_name}/"
     parquet_path = f"s3://{args['CURATED_BUCKET']}/staging_parquet/{table_name}/"
 
