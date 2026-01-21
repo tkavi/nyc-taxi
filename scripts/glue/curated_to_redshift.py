@@ -3,9 +3,13 @@ import json
 import time
 import sys
 from awsglue.utils import getResolvedOptions
+from pyspark.context import SparkContext
+from awsglue.context import GlueContext
+from awsglue.job import Job
 
 # Arguments from CloudFormation YAML
 args = getResolvedOptions(sys.argv, [
+    'JOB_NAME',
     'SECRET_NAME',
     'RAW_BUCKET',
     'CURATED_BUCKET',
@@ -13,6 +17,13 @@ args = getResolvedOptions(sys.argv, [
     'REDSHIFT_IAM_ROLE',
     'WORKGROUP_NAME' 
 ])
+
+# Initialize Glue/Spark Context for Delta conversion
+sc = SparkContext()
+glueContext = GlueContext(sc)
+spark = glueContext.spark_session
+job = Job(glueContext)
+job.init(args['JOB_NAME'], args)
 
 secrets_manager = boto3.client('secretsmanager')
 redshift_data = boto3.client('redshift-data')
@@ -60,6 +71,7 @@ sql_files = [
 ]
 
 for file_name in sql_files:
+   
     # Read SQL from S3
     print(f"Reading {file_name} from S3...")
     s3_key = f"{args['DDL_PATH']}/{file_name}"
@@ -71,11 +83,23 @@ for file_name in sql_files:
     
     table_name = file_name.replace(".sql", "") 
     data_path = f"s3://{args['CURATED_BUCKET']}/{table_name}/"
+    parquet_path = f"s3://{args['CURATED_BUCKET']}/staging_parquet/{table_name}/"
+
+    # --- NEW: DELTA TO PARQUET CONVERSION ---
+    print(f"Converting {table_name} from Delta to Parquet...")
+    try:
+        # Read the Delta table and write to a clean Parquet folder
+        df = spark.read.format("delta").load(data_path)
+        df.write.mode("overwrite").parquet(parquet_path)
+    except Exception as e:
+        print(f"Skipping conversion for {table_name} (might not be delta or empty): {e}")
+        # If it's already parquet, we point to the original path
+        parquet_path = data_path
 
     # Run COPY command
     copy_query = f"""
         COPY {table_name}
-        FROM '{data_path}'
+        FROM '{parquet_path}'
         IAM_ROLE '{args['REDSHIFT_IAM_ROLE']}'
         FORMAT AS PARQUET;
     """
