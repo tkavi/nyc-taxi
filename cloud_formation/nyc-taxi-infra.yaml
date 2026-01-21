@@ -169,6 +169,7 @@ Resources:
                   - 'redshift-data:GetStatementResult'
                   - 'redshift-data:ListStatements'
                   - 'redshift-serverless:GetWorkgroup'
+                  - 'redshift-serverless:GetCredentials'
                 Resource: "*"           
               # Permission to get the DB credentials from Secrets Manager
               - Effect: Allow
