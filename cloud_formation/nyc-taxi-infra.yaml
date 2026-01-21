@@ -280,7 +280,6 @@ Resources:
             Action: ["sts:AssumeRole"]
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess
-        - arn:aws:iam::aws:policy/AWSGlueConsoleReadOnlyAccess
 
   # ==== 3.6 IAM Role for QuickSight ==== #
   QuickSightVPCServiceRole:
