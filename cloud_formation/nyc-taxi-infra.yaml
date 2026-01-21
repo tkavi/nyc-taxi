@@ -430,7 +430,7 @@ Resources:
         "--SECRET_NAME": !Ref RedshiftSecret
         "--RAW_BUCKET": !Ref RawBucket
         "--CURATED_BUCKET": !Ref CuratedBucket
-        "--DDL_PATH": !Sub 's3://${ProjectName}-${Env}-raw-${AWS::AccountId}/scripts/ddl'
+        "--DDL_PATH": !Sub 'scripts/ddl'
         "--REDSHIFT_IAM_ROLE": !GetAtt RedshiftS3Role.Arn
         "--WORKGROUP_NAME": !Ref RedshiftWorkgroupV2
         '--enable-continuous-cloudwatch-log': 'true'
