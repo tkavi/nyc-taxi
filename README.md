@@ -23,16 +23,16 @@ Step 3 : AWS Console - Cloud Formation
 
 Possible Issues & Solutions
 1.	While creating Cloud Formation stack, in Permissions – Optional, if it errors and doesn’t allow to move forward
-Sol : For Permissions IAM role name -> follow the instructions for root and target accounts as below -
+   Sol : For Permissions IAM role name -> follow the instructions for root and target accounts as below -
 https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/stacksets-prereqs-self-managed.html
 
 2.	Below error while trying to push to git
 error: failed to push some refs to 'https://github.com/repo.git'
-Sol : git pull -> opens new screen for merge mgs -> type msg or do nothing -> click ‘esc : wq’ in that order to come out of the screen -> git push
+   Sol : git pull -> opens new screen for merge mgs -> type msg or do nothing -> click ‘esc : wq’ in that order to come out of the screen -> git push
 Code will be pushed to git. 
 
 3.	The CloudFormationExecutionRole has full AdminstratorAccess, still Glue role given in the nyc-taxi-infra.yaml file failed during the stack creation.
-Sol : Even if the role has AdministratorAccess, some cross-service operations (like handing a role to AWS Glue) require an explicit iam:PassRole to ensure you aren't escalating privileges.
+   Sol : Even if the role has AdministratorAccess, some cross-service operations (like handing a role to AWS Glue) require an explicit iam:PassRole to ensure you aren't escalating privileges.
 IAM -> ExecutionRole -> Add Permissions -> Create inline policy -> JSON -> Paste below policy.
 {
     "Version": "2012-10-17",
@@ -45,7 +45,6 @@ IAM -> ExecutionRole -> Add Permissions -> Create inline policy -> JSON -> Paste
         }
     ]
 }
-
-If this happened after first time creating a stack, its better to delete the stack and create a new stack after adding this policy.
+   If this happened after first time creating a stack, its better to delete the stack and create a new stack after adding this policy.
 
 
